@@ -1,0 +1,2 @@
+add_lunch_combo cm_40S404-eng
+add_lunch_combo cm_40S404-userdebug
