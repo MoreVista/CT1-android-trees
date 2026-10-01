@@ -65,6 +65,14 @@ BOARD_WLAN_DEVICE := mrvl
 WPA_SUPPLICANT_VERSION := VER_0_8_X
 BOARD_WPA_SUPPLICANT_DRIVER := NL80211
 BOARD_HOSTAPD_DRIVER := NL80211
+# nl80211's driver ops struct references wpa_driver_nl80211_driver_cmd, which
+# lives in a vendor "driver_cmd" private lib -- without one, wpa_supplicant
+# and hostapd fail to LINK ("undefined reference to
+# wpa_driver_nl80211_driver_cmd"). This tree ships no Marvell-specific one;
+# lib_driver_cmd_bcmdhd is the generic nl80211 implementation other
+# non-Broadcom devices reuse for exactly this (same fix as TAB-A03-BR).
+BOARD_WPA_SUPPLICANT_PRIVATE_LIB := lib_driver_cmd_bcmdhd
+BOARD_HOSTAPD_PRIVATE_LIB := lib_driver_cmd_bcmdhd
 WIFI_DRIVER_FW_PATH_PARAM := "/dev/null"
 
 TARGET_USES_LOGD := true
