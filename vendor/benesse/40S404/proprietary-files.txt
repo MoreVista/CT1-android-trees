@@ -1,0 +1,40 @@
+# Benesse 40S404 (i.MX6Q "bee01") proprietary blobs.
+# Extracted directly from the stock /system on the real unit (SN <40S404-twrp-serial>),
+# 2026-10-01, via adb pull with root. See ../twrp-build-40s404.md (sibling
+# TWRP project) for how these were identified.
+
+# GPU (Vivante GC350)
+lib/libGAL.so
+lib/libGLES_trace.so
+lib/libjni_eglfence.so
+egl/libEGL_VIVANTE.so
+egl/libGLES_android.so
+egl/libGLESv1_CM_VIVANTE.so
+egl/libGLESv2_VIVANTE.so
+egl/egl.cfg
+
+# Audio HAL
+hw/audio.primary.imx6.so
+hw/audio.a2dp.default.so
+hw/audio.r_submix.default.so
+hw/audio.usb.default.so
+hw/audio_policy.default.so
+
+# Camera, display, sensors, power, lights HALs
+hw/camera.imx6.so
+hw/gralloc.imx6.so
+hw/gralloc_viv.imx6.so
+hw/hwcomposer.imx6.so
+hw/hwcomposer_viv.imx6.so
+hw/lights.imx6.so
+hw/power.imx6.so
+hw/sensors.SABRESD.so
+
+# WiFi (Marvell sd8787, SDIO) -- out-of-tree kernel modules, no source in the
+# GPL kernel dump. Must be loaded against the EXACT kernel ABI they were
+# built for -- this device tree reuses the stock kernel verbatim (same
+# strategy as the TWRP port) specifically so these keep working unmodified.
+etc/wifi/mlan.ko
+etc/wifi/sd8787.ko
+etc/wifi/wpa_supplicant.conf
+etc/firmware/mrvl/sd8787_uapsta.bin
