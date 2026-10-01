@@ -61,7 +61,19 @@ TARGET_HARDWARE_3D := true
 # loaded in that order -- see init.40S404.rc). Starting with NL80211 per
 # modern wpa_supplicant default; this chip/driver generation may turn out
 # to need WEXT instead -- revisit if wpa_supplicant fails to attach.
-BOARD_WLAN_DEVICE := mrvl
+#
+# BOARD_WLAN_DEVICE is set to "bcmdhd", NOT our actual chip family ("mrvl").
+# This is deliberate: hardware/broadcom/wlan/bcmdhd/Android.mk is a
+# findleaves.py "leaf" (the directory has no other Android.mk, so
+# findleaves stops there) that only does
+# `ifeq ($(BOARD_WLAN_DEVICE),bcmdhd) include $(call all-subdir-makefiles)`
+# -- with BOARD_WLAN_DEVICE=mrvl, wpa_supplicant_8_lib/Android.mk (which
+# defines lib_driver_cmd_bcmdhd, see below) is a dead branch findleaves
+# never even reaches, and the build fails with "No rule to make target
+# lib_driver_cmd_bcmdhd". There is no mrvl equivalent in this tree. Actual
+# WiFi driver loading is fully custom (insmod in init.40S404.rc) and does
+# not depend on this variable's usual meaning.
+BOARD_WLAN_DEVICE := bcmdhd
 WPA_SUPPLICANT_VERSION := VER_0_8_X
 BOARD_WPA_SUPPLICANT_DRIVER := NL80211
 BOARD_HOSTAPD_DRIVER := NL80211
