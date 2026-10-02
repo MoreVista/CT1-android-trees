@@ -1,0 +1,123 @@
+# Device init for Benesse 40S404 (i.MX6, androidboot.hardware=freescale).
+# Ported from the stock ramdisk's init.freescale.rc. The file name matters:
+# init.rc does `import /init.${ro.hardware}.rc` and the kernel cmdline sets
+# androidboot.hardware=freescale, so a file named after the product
+# (init.40S404.rc) is never read. Without this file nothing mounts /system
+# or /data (mount_all below is the only place that happens) and
+# init.freescale.usb.rc never configures the USB gadget, so the device
+# boots "blind": no display, no adb, no UART output after init starts.
+
+import init.${ro.hardware}.usb.rc
+
+on init
+    start watchdogd
+
+    # See storage config details at http://source.android.com/tech/storage/
+    mkdir /mnt/shell/emulated 0700 shell shell
+    mkdir /storage/emulated 0555 root root
+
+    export EXTERNAL_STORAGE /storage/emulated/legacy
+    export EXTERNAL_STORAGE_EXTSD /mnt/extsd
+    export EMULATED_STORAGE_SOURCE /mnt/shell/emulated
+    export EMULATED_STORAGE_TARGET /storage/emulated
+
+    # Support legacy paths
+    symlink /storage/emulated/legacy /sdcard
+    symlink /storage/emulated/legacy /mnt/sdcard
+    symlink /storage/emulated/legacy /storage/sdcard0
+    symlink /mnt/shell/emulated/0 /storage/emulated/legacy
+
+on fs
+    mount_all /fstab.freescale
+
+on boot
+    # Set permission for IIM node
+    symlink /dev/mxs_viim /dev/mxc_mem
+
+    setprop ro.tether.denied false
+
+    # 3D acceleration property
+    setprop debug.sf.showfps    0
+    setprop debug.sf.enable_hgl 1
+    setprop debug.egl.hw        1
+
+    setprop hwc.stretch.filter  1
+    setprop hwc.enable_dither   1
+
+    setprop media.omxgm.enable-player 0
+    setprop media.omxgm.enable-record 0
+    setprop media.omxgm.enable-scan 0
+    setprop rw.VIDEO_RENDER_NAME video_render.surface
+
+    # Camera
+    setprop camera.disable_zsl_mode 1
+    setprop back_camera_name sr200pc20
+    setprop back_camera_orient 0
+    setprop front_camera_orient 0
+
+    setprop ro.opengles.version 131072
+    setprop ro.sf.hwrotation 0
+    setprop ro.sf.lcd_density 160
+
+    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
+    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
+    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+    chown root system /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+    chmod 0440 /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
+    chown root system /sys/devices/system/cpu/cpu0/online
+    chmod 0664 /sys/devices/system/cpu/cpu0/online
+    chown root system /sys/devices/system/cpu/cpu1/online
+    chmod 0664 /sys/devices/system/cpu/cpu1/online
+
+    setprop gsm.ril.delay 15
+    setprop ro.ril.wake_lock_timeout 300
+
+    # Backlight (pwm-backlight sysfs class)
+    setprop hw.backlight.dev "pwm-backlight.0"
+    chown system system /sys/class/backlight/pwm-backlight.0/brightness
+    chmod 0660 /sys/class/backlight/pwm-backlight.0/brightness
+
+    # Light sensor
+    setprop ro.hardware.lightsensor "/sys/class/i2c-dev/i2c-2/device/2-0044/"
+    setprop ro.lightsensor.threshold  20
+
+    setprop wlan.interface wlan0
+
+    mount debugfs none /sys/kernel/debug/
+
+    # Marvell sd8787 (SDIO WiFi): out-of-tree prebuilt modules, core first.
+    insmod /system/etc/wifi/mlan.ko
+    insmod /system/etc/wifi/sd8787.ko
+
+service wpa_supplicant /system/bin/wpa_supplicant \
+    -Dnl80211 -iwlan0 -c/data/misc/wifi/wpa_supplicant.conf -e/data/misc/wifi/entropy.bin
+    class main
+    socket wpa_wlan0 dgram 660 wifi wifi
+    disabled
+    oneshot
+
+service mlan2040coex /system/bin/mlan2040coex -i wlan0
+    class main
+    disabled
+
+service mlan_init /system/bin/mlaninit.sh
+    class late_start
+    oneshot
+
+service iprenew_wlan0 /system/bin/dhcpcd -n
+    class late_start
+    disabled
+    oneshot
+
+service wifi_reset /system/bin/wifi_reset.sh
+    class late_start
+    disabled
+    oneshot
+
+service cp_calib /system/bin/copy_calib.sh
+    class late_start
+    oneshot
