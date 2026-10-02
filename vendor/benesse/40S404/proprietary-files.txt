@@ -38,3 +38,12 @@ etc/wifi/mlan.ko
 etc/wifi/sd8787.ko
 etc/wifi/wpa_supplicant.conf
 etc/firmware/mrvl/sd8787_uapsta.bin
+
+# WiFi bring-up helpers invoked by init.freescale.rc services (mlan_init,
+# wifi_reset, cp_calib, mlan2040coex). Pulled from the stock backup tar.
+bin/mlaninit.sh
+bin/mlanutl
+bin/mlan2040coex
+bin/set_macaddr
+bin/wifi_reset.sh
+bin/copy_calib.sh

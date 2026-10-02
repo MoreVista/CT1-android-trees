@@ -25,7 +25,13 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/proprietary/etc/wifi/mlan.ko:system/etc/wifi/mlan.ko \
     $(LOCAL_PATH)/proprietary/etc/wifi/sd8787.ko:system/etc/wifi/sd8787.ko \
     $(LOCAL_PATH)/proprietary/etc/wifi/wpa_supplicant.conf:system/etc/wifi/wpa_supplicant.conf \
-    $(LOCAL_PATH)/proprietary/etc/firmware/mrvl/sd8787_uapsta.bin:system/etc/firmware/mrvl/sd8787_uapsta.bin
+    $(LOCAL_PATH)/proprietary/etc/firmware/mrvl/sd8787_uapsta.bin:system/etc/firmware/mrvl/sd8787_uapsta.bin \
+    $(LOCAL_PATH)/proprietary/bin/mlaninit.sh:system/bin/mlaninit.sh \
+    $(LOCAL_PATH)/proprietary/bin/mlanutl:system/bin/mlanutl \
+    $(LOCAL_PATH)/proprietary/bin/mlan2040coex:system/bin/mlan2040coex \
+    $(LOCAL_PATH)/proprietary/bin/set_macaddr:system/bin/set_macaddr \
+    $(LOCAL_PATH)/proprietary/bin/wifi_reset.sh:system/bin/wifi_reset.sh \
+    $(LOCAL_PATH)/proprietary/bin/copy_calib.sh:system/bin/copy_calib.sh
 
 # All of the above are pure prebuilt binaries installed via PRODUCT_COPY_FILES
 # (no source, so no PRODUCT_PACKAGES / LOCAL_MODULE entries for them).
