@@ -1,5 +1,7 @@
 LOCAL_PATH := vendor/benesse/40S404
 
+$(call inherit-product, vendor/benesse/40S404/40S404-omx.mk)
+
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/proprietary/lib/libGAL.so:system/lib/libGAL.so \
     $(LOCAL_PATH)/proprietary/lib/libGLES_trace.so:system/lib/libGLES_trace.so \
