@@ -25,6 +25,8 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/proprietary/hw/lights.imx6.so:system/lib/hw/lights.imx6.so \
     $(LOCAL_PATH)/proprietary/hw/power.imx6.so:system/lib/hw/power.imx6.so \
     $(LOCAL_PATH)/proprietary/hw/sensors.SABRESD.so:system/lib/hw/sensors.SABRESD.so \
+    $(LOCAL_PATH)/proprietary/etc/audio_policy.conf:system/etc/audio_policy.conf \
+    $(LOCAL_PATH)/proprietary/etc/media_profiles.xml:system/etc/media_profiles.xml \
     $(LOCAL_PATH)/proprietary/etc/wifi/mlan.ko:system/etc/wifi/mlan.ko \
     $(LOCAL_PATH)/proprietary/etc/wifi/sd8787.ko:system/etc/wifi/sd8787.ko \
     $(LOCAL_PATH)/proprietary/etc/wifi/wpa_supplicant.conf:system/etc/wifi/wpa_supplicant.conf \

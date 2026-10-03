@@ -53,3 +53,8 @@ bin/mlan2040coex
 bin/set_macaddr
 bin/wifi_reset.sh
 bin/copy_calib.sh
+
+# Audio routing / media profiles (stock). media_codecs.xml is NOT taken: it lists
+# Freescale OMX/VPU components (lib_omx_*, libvpu) that are not ported yet.
+etc/audio_policy.conf
+etc/media_profiles.xml
