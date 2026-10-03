@@ -39,6 +39,18 @@ Status (2026-10-03): boots, lockscreen/UI render on GPU (GLES2/HWUI), adb, WiFi 
    Manual recovery from TWRP: write `adb` to /data/property/persist.sys.usb.config and
    insert `adb_enabled=1` into settings.db (global table; remove -wal/-shm, chown 1000).
 
+7. **WiFi not usable from the UI on fresh /data** -- /data/misc/wifi/sockets did not
+   exist (stock init.rc created it). libhardware_legacy's wpa_ctrl binds its client
+   socket there, so every connect failed ENOENT. Added mkdir in `on post-fs-data`.
+   ("softap fwreload ... failed" in the log is harmless on this driver.)
+8. **Touch offset** -- rohm_bu21025 declares 0-1024 x 0-768 but produces X 40-936,
+   Y 70-732. `patches/frameworks_base-EventHub-idc-abs-range.patch` lets the .idc
+   override ranges (`abs.<code>.min/max`); also needs rohm_bu21025.idc
+   (`touch.deviceType = touchScreen`, otherwise it is treated as a touchpad/mouse).
+9. **Speaker silent** -- wm8978 right speaker/mixer path off by default; `audio_init.sh`
+   sets it at boot (needs `libtinyfsl.so` = stock libtinyalsa with control_open, and a
+   patched DT_NEEDED in audio.primary.imx6.so).
+
 ## Gotchas
 - Never `ctl.restart surfaceflinger` for experiments: system_server keeps a stale
   display token ("Attempt to blank null display", mDisplayReady=false).
