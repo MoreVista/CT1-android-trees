@@ -74,6 +74,20 @@ Status (2026-10-03): boots, lockscreen/UI render on GPU (GLES2/HWUI), adb, WiFi 
 14. **App OOM (SkyTube "playback error")** -- no dalvik.vm.heap* props, so the VM used its
    16 MB default heap. Added the stock values (heapgrowthlimit 64m, heapsize 384m...).
 
+15. **Hardware video decode (Freescale VPU)** -- ported the stock OMX stack:
+   `lib_omx_*`, `libvpu`, `lib_vpu_wrapper`, `libstagefrighthw` (vendor `40S404-omx.mk`), VPU firmware
+   (/system/lib/firmware/vpu), the three *_register files, the stock `media_codecs.xml`, and the init
+   exports (CORE/COMPONENT/CONTENTPIPE_REGISTER_FILE, VPU_FW_PATH, SHM_MOUNTPOINT=/mnt/shm tmpfs) --
+   they must be in init's environment so mediaserver AND app processes inherit them.
+   Needed framework patches (patches/): (a) `frameworks_av-fsl-native-color-format.patch` maps OMX
+   color formats to the i.MX gralloc formats (19->0x101, 21->0x103, 22->0x100, 6->RGB565) and, like stock,
+   hands *all* output buffers to the VPU (minUndequeuedBufs = 0); (b)
+   `frameworks_native-BufferQueue-no-min-undequeued-check.patch` removes the newer BufferQueue
+   "min undequeued buffer count exceeded" (-EBUSY) check that stock does not have.
+   Software H.264 (OMX.google, On2) is Baseline only and fails with STRM_ERR(-2) on High/Main
+   profile YouTube streams; the VPU decodes them.
+   Debug aids: /data/omx_log_level, /data/vpu_log_level (need mediaserver restart).
+
 ## Gotchas
 - Never `ctl.restart surfaceflinger` for experiments: system_server keeps a stale
   display token ("Attempt to blank null display", mDisplayReady=false).

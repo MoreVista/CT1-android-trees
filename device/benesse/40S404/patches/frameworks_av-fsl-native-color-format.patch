@@ -1,0 +1,100 @@
+diff --git a/media/libstagefright/ACodec.cpp b/media/libstagefright/ACodec.cpp
+index a9e344d03..71b228ded 100644
+--- a/media/libstagefright/ACodec.cpp
++++ b/media/libstagefright/ACodec.cpp
+@@ -540,6 +540,19 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
+     return OK;
+ }
+ 
++
++// Freescale i.MX gralloc does not understand raw OMX color-format values; stock maps
++// them to its own HAL formats before sizing the native window buffers.
++static int fslNativeFormatFromOmx(OMX_COLOR_FORMATTYPE f) {
++    switch ((int)f) {
++        case OMX_COLOR_Format16bitRGB565:           return HAL_PIXEL_FORMAT_RGB_565;
++        case OMX_COLOR_FormatYUV420Planar:          return 0x101;
++        case OMX_COLOR_FormatYUV420SemiPlanar:      return 0x103;
++        case OMX_COLOR_FormatYUV420PackedSemiPlanar:return 0x100;
++        default:                                    return (int)f;
++    }
++}
++
+ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
+     OMX_PARAM_PORTDEFINITIONTYPE def;
+     InitOMXParams(&def);
+@@ -566,7 +579,7 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
+             mNativeWindow.get(),
+             def.format.video.nFrameWidth,
+             def.format.video.nFrameHeight,
+-            def.format.video.eColorFormat);
++            fslNativeFormatFromOmx(def.format.video.eColorFormat));
+ #endif
+ 
+     if (err != 0) {
+@@ -630,8 +643,14 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
+     // XXX: Is this the right logic to use?  It's not clear to me what the OMX
+     // buffer counts refer to - how do they account for the renderer holding on
+     // to buffers?
+-    if (def.nBufferCountActual < def.nBufferCountMin + minUndequeuedBufs) {
+-        OMX_U32 newBufferCount = def.nBufferCountMin + minUndequeuedBufs;
++    // Freescale stock behaviour: the VPU decoder needs every frame buffer it
++    // reports, so none are held back for the native window (stock overwrites
++    // minUndequeuedBufs with 0 here). Requires BufferQueue not to enforce its
++    // min-undequeued check (see patches/frameworks_native-BufferQueue-*.patch).
++    minUndequeuedBufs = 0;
++
++    if (def.nBufferCountActual < def.nBufferCountMin) {
++        OMX_U32 newBufferCount = def.nBufferCountMin;
+         def.nBufferCountActual = newBufferCount;
+         err = mOMX->setParameter(
+                 mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
+diff --git a/media/libstagefright/OMXCodec.cpp b/media/libstagefright/OMXCodec.cpp
+index 91ba0930b..d1571b185 100644
+--- a/media/libstagefright/OMXCodec.cpp
++++ b/media/libstagefright/OMXCodec.cpp
+@@ -2070,6 +2070,19 @@ status_t OMXCodec::applyRotation() {
+     return err;
+ }
+ 
++
++// Freescale i.MX gralloc does not understand raw OMX color-format values; stock maps
++// them to its own HAL formats before sizing the native window buffers.
++static int fslNativeFormatFromOmx(OMX_COLOR_FORMATTYPE f) {
++    switch ((int)f) {
++        case OMX_COLOR_Format16bitRGB565:           return HAL_PIXEL_FORMAT_RGB_565;
++        case OMX_COLOR_FormatYUV420Planar:          return 0x101;
++        case OMX_COLOR_FormatYUV420SemiPlanar:      return 0x103;
++        case OMX_COLOR_FormatYUV420PackedSemiPlanar:return 0x100;
++        default:                                    return (int)f;
++    }
++}
++
+ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
+     // Get the number of buffers needed.
+     OMX_PARAM_PORTDEFINITIONTYPE def;
+@@ -2088,7 +2101,7 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
+             mNativeWindow.get(),
+             def.format.video.nFrameWidth,
+             def.format.video.nFrameHeight,
+-            def.format.video.eColorFormat);
++            fslNativeFormatFromOmx(def.format.video.eColorFormat));
+ #else
+     OMX_COLOR_FORMATTYPE eColorFormat;
+ 
+@@ -2176,8 +2189,14 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
+     // XXX: Is this the right logic to use?  It's not clear to me what the OMX
+     // buffer counts refer to - how do they account for the renderer holding on
+     // to buffers?
+-    if (def.nBufferCountActual < def.nBufferCountMin + minUndequeuedBufs) {
+-        OMX_U32 newBufferCount = def.nBufferCountMin + minUndequeuedBufs;
++    // Freescale stock behaviour: the VPU decoder needs every frame buffer it
++    // reports, so none are held back for the native window (stock overwrites
++    // minUndequeuedBufs with 0 here). Requires BufferQueue not to enforce its
++    // min-undequeued check (see patches/frameworks_native-BufferQueue-*.patch).
++    minUndequeuedBufs = 0;
++
++    if (def.nBufferCountActual < def.nBufferCountMin) {
++        OMX_U32 newBufferCount = def.nBufferCountMin;
+         def.nBufferCountActual = newBufferCount;
+         err = mOMX->setParameter(
+                 mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
