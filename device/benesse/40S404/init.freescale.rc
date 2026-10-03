@@ -12,6 +12,10 @@ import init.${ro.hardware}.usb.rc
 on init
     start watchdogd
 
+    # Mount points used by the stock fstab / calibration scripts
+    mkdir /device 0771 system system
+    mkdir /factory 0771 system system
+
     # See storage config details at http://source.android.com/tech/storage/
     mkdir /mnt/shell/emulated 0700 shell shell
     mkdir /storage/emulated 0555 root root
@@ -89,9 +93,7 @@ on boot
 
     mount debugfs none /sys/kernel/debug/
 
-    # Marvell sd8787 (SDIO WiFi): out-of-tree prebuilt modules, core first.
-    insmod /system/etc/wifi/mlan.ko
-    insmod /system/etc/wifi/sd8787.ko
+    # Marvell sd8787 (SDIO WiFi) is loaded by the wifi_load service below.
 
 service wpa_supplicant /system/bin/wpa_supplicant \
     -Dnl80211 -iwlan0 -c/data/misc/wifi/wpa_supplicant.conf -e/data/misc/wifi/entropy.bin
@@ -104,8 +106,10 @@ service mlan2040coex /system/bin/mlan2040coex -i wlan0
     class main
     disabled
 
-service mlan_init /system/bin/mlaninit.sh
+# Resets the chip, insmods mlan/sd8787 with stock parameters, then runs mlaninit.sh.
+service wifi_load /system/bin/wifi_load.sh
     class late_start
+    user root
     oneshot
 
 service iprenew_wlan0 /system/bin/dhcpcd -n
