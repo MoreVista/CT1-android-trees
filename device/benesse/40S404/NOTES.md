@@ -66,6 +66,11 @@ Status (2026-10-03): boots, lockscreen/UI render on GPU (GLES2/HWUI), adb, WiFi 
    Host note: gvfs-mtp grabbing the device makes the host adb server drop it;
    unmount (`gio mount -u mtp://...`) and `adb kill-server; adb start-server`.
 
+13. **No video playback ("Failed to instantiate decoder")** -- /system/etc/media_codecs.xml
+   was missing so stagefright knew no codecs. Added a software-only list
+   (OMX.google.*). stagefright decode: 240p 395 fps, 480p ~95-110 fps. The VPU
+   (OMX.Freescale.* + libvpu/lib_vpu_wrapper) is NOT ported; HD video will be CPU-bound.
+
 ## Gotchas
 - Never `ctl.restart surfaceflinger` for experiments: system_server keeps a stale
   display token ("Attempt to blank null display", mDisplayReady=false).
