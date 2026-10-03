@@ -18,6 +18,7 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/ueventd.freescale.rc:root/ueventd.freescale.rc \
     $(LOCAL_PATH)/fstab.freescale:root/fstab.freescale \
     $(LOCAL_PATH)/wifi_load.sh:system/bin/wifi_load.sh \
+    $(LOCAL_PATH)/idc/rohm_bu21025.idc:system/usr/idc/rohm_bu21025.idc \
     system/core/rootdir/init.usb.rc:root/init.usb.rc \
     system/core/rootdir/init.trace.rc:root/init.trace.rc
 
