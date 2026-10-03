@@ -7,6 +7,7 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/proprietary/lib/libGLSLC.so:system/lib/libGLSLC.so \
     $(LOCAL_PATH)/proprietary/lib/libg2d.so:system/lib/libg2d.so \
     $(LOCAL_PATH)/proprietary/lib/libion.so:system/lib/libion.so \
+    $(LOCAL_PATH)/proprietary/lib/libtinyfsl.so:system/lib/libtinyfsl.so \
     $(LOCAL_PATH)/proprietary/egl/libEGL_VIVANTE.so:system/lib/egl/libEGL_VIVANTE.so \
     $(LOCAL_PATH)/proprietary/egl/libGLES_android.so:system/lib/egl/libGLES_android.so \
     $(LOCAL_PATH)/proprietary/egl/libGLESv1_CM_VIVANTE.so:system/lib/egl/libGLESv1_CM_VIVANTE.so \
@@ -33,6 +34,7 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/proprietary/etc/firmware/mrvl/sd8787_uapsta.bin:system/etc/firmware/mrvl/sd8787_uapsta.bin \
     $(LOCAL_PATH)/proprietary/bin/mlaninit.sh:system/bin/mlaninit.sh \
     $(LOCAL_PATH)/proprietary/bin/mlanutl:system/bin/mlanutl \
+    $(LOCAL_PATH)/proprietary/bin/tinymix:system/bin/tinymix \
     $(LOCAL_PATH)/proprietary/bin/mlan2040coex:system/bin/mlan2040coex \
     $(LOCAL_PATH)/proprietary/bin/set_macaddr:system/bin/set_macaddr \
     $(LOCAL_PATH)/proprietary/bin/wifi_reset.sh:system/bin/wifi_reset.sh \

@@ -58,3 +58,12 @@ bin/copy_calib.sh
 # Freescale OMX/VPU components (lib_omx_*, libvpu) that are not ported yet.
 etc/audio_policy.conf
 etc/media_profiles.xml
+
+# Freescale-extended tinyalsa (control_open & co. needed by audio.primary.imx6).
+# Shipped as libtinyfsl.so (stock libtinyalsa.so) so CM's own libtinyalsa is untouched;
+# hw/audio.primary.imx6.so has its DT_NEEDED string patched libtinyalsa.so -> libtinyfsl.so
+# (same length, in-place) to use it.
+lib/libtinyfsl.so
+
+# tinymix (stock, uses CM libtinyalsa mixer API) for audio_init.sh
+bin/tinymix
