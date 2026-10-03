@@ -31,6 +31,12 @@ on init
     symlink /storage/emulated/legacy /storage/sdcard0
     symlink /mnt/shell/emulated/0 /storage/emulated/legacy
 
+on post-fs-data
+    # wpa_ctrl binds its client socket in here; without it the framework fails
+    # with "Unable to open connection to supplicant on wlan0: No such file".
+    mkdir /data/misc/wifi 0770 wifi wifi
+    mkdir /data/misc/wifi/sockets 0770 wifi wifi
+
 on fs
     mount_all /fstab.freescale
 
