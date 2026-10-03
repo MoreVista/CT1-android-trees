@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Primary storage is the FUSE-emulated /data/media (see service sdcard in
+     init.freescale.rc); /storage/sdcard0 -> /storage/emulated/legacy.
+     Without this the framework defaults to a non-existent /mnt/sdcard and MTP
+     has nothing to export. -->
+<StorageList xmlns:android="http://schemas.android.com/apk/res/android">
+    <storage android:mountPoint="/storage/sdcard0"
+             android:storageDescription="@string/storage_internal"
+             android:primary="true"
+             android:emulated="true"
+             android:mtpReserve="100" />
+    <storage android:mountPoint="/storage/extsd"
+             android:storageDescription="@string/storage_sd_card"
+             android:primary="false"
+             android:removable="true" />
+    <storage android:mountPoint="/storage/udisk"
+             android:storageDescription="@string/storage_usb"
+             android:primary="false"
+             android:removable="true" />
+</StorageList>

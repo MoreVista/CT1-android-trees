@@ -2,6 +2,8 @@ LOCAL_PATH := device/benesse/40S404
 
 $(call inherit-product, vendor/benesse/40S404/40S404-vendor.mk)
 
+DEVICE_PACKAGE_OVERLAYS := $(LOCAL_PATH)/overlay
+
 PRODUCT_AAPT_CONFIG := normal
 TARGET_SCREEN_WIDTH := 1024
 TARGET_SCREEN_HEIGHT := 768
@@ -18,6 +20,7 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/ueventd.freescale.rc:root/ueventd.freescale.rc \
     $(LOCAL_PATH)/fstab.freescale:root/fstab.freescale \
     $(LOCAL_PATH)/wifi_load.sh:system/bin/wifi_load.sh \
+    $(LOCAL_PATH)/vold.fstab:system/etc/vold.fstab \
     $(LOCAL_PATH)/audio_init.sh:system/bin/audio_init.sh \
     $(LOCAL_PATH)/idc/rohm_bu21025.idc:system/usr/idc/rohm_bu21025.idc \
     system/core/rootdir/init.usb.rc:root/init.usb.rc \
