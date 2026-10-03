@@ -4,6 +4,9 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/proprietary/lib/libGAL.so:system/lib/libGAL.so \
     $(LOCAL_PATH)/proprietary/lib/libGLES_trace.so:system/lib/libGLES_trace.so \
     $(LOCAL_PATH)/proprietary/lib/libjni_eglfence.so:system/lib/libjni_eglfence.so \
+    $(LOCAL_PATH)/proprietary/lib/libGLSLC.so:system/lib/libGLSLC.so \
+    $(LOCAL_PATH)/proprietary/lib/libg2d.so:system/lib/libg2d.so \
+    $(LOCAL_PATH)/proprietary/lib/libion.so:system/lib/libion.so \
     $(LOCAL_PATH)/proprietary/egl/libEGL_VIVANTE.so:system/lib/egl/libEGL_VIVANTE.so \
     $(LOCAL_PATH)/proprietary/egl/libGLES_android.so:system/lib/egl/libGLES_android.so \
     $(LOCAL_PATH)/proprietary/egl/libGLESv1_CM_VIVANTE.so:system/lib/egl/libGLESv1_CM_VIVANTE.so \
