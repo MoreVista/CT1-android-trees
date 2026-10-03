@@ -97,6 +97,11 @@ on boot
 
 # Emulated internal storage (/sdcard -> /storage/emulated/legacy). Stock served
 # p7 (/eMMCp7/media); this uses /data/media on the much larger p4 instead.
+service audio_init /system/bin/audio_init.sh
+    class late_start
+    user root
+    oneshot
+
 service sdcard /system/bin/sdcard -t4 /data/media /mnt/shell/emulated 1023 1023
     class late_start
 
