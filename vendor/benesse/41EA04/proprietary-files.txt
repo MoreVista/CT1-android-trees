@@ -7,6 +7,12 @@
 lib/libGAL.so
 lib/libGLES_trace.so
 lib/libjni_eglfence.so
+# Vivante GLSL shader compiler: dlopen'd by libGLESv2_VIVANTE. Without it every
+# glCompileShader fails silently, so HWUI (GLES2) renders nothing -> blank UI.
+lib/libGLSLC.so
+# 2D GPU (used by hwcomposer_viv) and ION wrapper
+lib/libg2d.so
+lib/libion.so
 egl/libEGL_VIVANTE.so
 egl/libGLES_android.so
 egl/libGLESv1_CM_VIVANTE.so
