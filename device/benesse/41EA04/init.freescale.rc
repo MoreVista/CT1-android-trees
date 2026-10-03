@@ -36,6 +36,9 @@ on post-fs-data
     # with "Unable to open connection to supplicant on wlan0: No such file".
     mkdir /data/misc/wifi 0770 wifi wifi
     mkdir /data/misc/wifi/sockets 0770 wifi wifi
+    # dhcpcd keeps its lease/pid files here
+    mkdir /data/misc/dhcp 0770 dhcp dhcp
+    chown dhcp dhcp /data/misc/dhcp
 
 on fs
     mount_all /fstab.freescale
@@ -126,6 +129,13 @@ service mlan2040coex /system/bin/mlan2040coex -i wlan0
 service wifi_load /system/bin/wifi_load.sh
     class late_start
     user root
+    oneshot
+
+# Started by the framework (DhcpStateMachine) via ctl.start dhcpcd_wlan0:<args>;
+# without it the UI sits on "Obtaining IP address" forever.
+service dhcpcd_wlan0 /system/bin/dhcpcd -ABKL
+    class late_start
+    disabled
     oneshot
 
 service iprenew_wlan0 /system/bin/dhcpcd -n

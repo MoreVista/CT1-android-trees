@@ -51,6 +51,12 @@ Status (2026-10-03): boots, lockscreen/UI render on GPU (GLES2/HWUI), adb, WiFi 
    sets it at boot (needs `libtinyfsl.so` = stock libtinyalsa with control_open, and a
    patched DT_NEEDED in audio.primary.imx6.so).
 
+10. **Stuck on "Obtaining IP address"** -- no `dhcpcd_wlan0` service in our rc (stock had it
+   in init.rc) and no /data/misc/dhcp. Added both. Verified manually:
+   `dhcpcd -ABKL wlan0` leases an address.
+11. **Settings had no Wi-Fi entry** -- /system/etc/permissions feature XMLs (wifi,
+   accelerometer, usb host/accessory, faketouch, touchscreen, location) were missing.
+
 ## Gotchas
 - Never `ctl.restart surfaceflinger` for experiments: system_server keeps a stale
   display token ("Attempt to blank null display", mDisplayReady=false).
