@@ -32,6 +32,13 @@ Status (2026-10-03): boots, lockscreen/UI render on GPU (GLES2/HWUI), adb, WiFi 
    Verified with `sendevent /dev/input/event0 1 116 ...` (real gpio-keys path;
    `input keyevent` injection does not exercise user-activity the same way).
 
+6. **No adb / hot "android_usb: already disabled" loop after wiping /data** -- on a
+   fresh Settings DB the ADB_PORT insert fires UsbDeviceManager's AdbSettingsObserver,
+   which read the missing ADB_ENABLED row as 0, disabled adb and persisted
+   `persist.sys.usb.config=none`. Fix: `patches/frameworks_base-UsbDeviceManager-adb-default.patch`.
+   Manual recovery from TWRP: write `adb` to /data/property/persist.sys.usb.config and
+   insert `adb_enabled=1` into settings.db (global table; remove -wal/-shm, chown 1000).
+
 ## Gotchas
 - Never `ctl.restart surfaceflinger` for experiments: system_server keeps a stale
   display token ("Attempt to blank null display", mDisplayReady=false).
