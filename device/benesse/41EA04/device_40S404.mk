@@ -49,6 +49,16 @@ PRODUCT_PACKAGES += \
     hostapd_cli \
     wpa_cli
 
+# Dalvik heap sizing (values from the stock build.prop). Without these the VM
+# falls back to a 16 MB per-app heap and apps such as SkyTube die with OOM.
+PRODUCT_PROPERTY_OVERRIDES += \
+    dalvik.vm.heapstartsize=8m \
+    dalvik.vm.heapgrowthlimit=64m \
+    dalvik.vm.heapsize=384m \
+    dalvik.vm.heaptargetutilization=0.75 \
+    dalvik.vm.heapminfree=512k \
+    dalvik.vm.heapmaxfree=8m
+
 PRODUCT_PROPERTY_OVERRIDES += \
     wifi.interface=wlan0 \
     wifi.supplicant_scan_interval=15 \

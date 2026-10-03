@@ -71,6 +71,9 @@ Status (2026-10-03): boots, lockscreen/UI render on GPU (GLES2/HWUI), adb, WiFi 
    (OMX.google.*). stagefright decode: 240p 395 fps, 480p ~95-110 fps. The VPU
    (OMX.Freescale.* + libvpu/lib_vpu_wrapper) is NOT ported; HD video will be CPU-bound.
 
+14. **App OOM (SkyTube "playback error")** -- no dalvik.vm.heap* props, so the VM used its
+   16 MB default heap. Added the stock values (heapgrowthlimit 64m, heapsize 384m...).
+
 ## Gotchas
 - Never `ctl.restart surfaceflinger` for experiments: system_server keeps a stale
   display token ("Attempt to blank null display", mDisplayReady=false).
