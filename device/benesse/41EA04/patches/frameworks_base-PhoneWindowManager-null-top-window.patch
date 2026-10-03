@@ -1,0 +1,14 @@
+diff --git a/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java b/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+index 7415a1fc30..1d25c8cfd0 100644
+--- a/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
++++ b/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+@@ -4079,7 +4079,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+             }
+ 
+             case KeyEvent.KEYCODE_POWER: {
+-                if ((mTopFullscreenOpaqueWindowState.getAttrs().flags
++                if (mTopFullscreenOpaqueWindowState != null
++                        && (mTopFullscreenOpaqueWindowState.getAttrs().flags
+                         & WindowManager.LayoutParams.PREVENT_POWER_KEY) != 0){
+                     return result;
+                 }
