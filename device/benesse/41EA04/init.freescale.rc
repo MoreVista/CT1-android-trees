@@ -12,6 +12,17 @@ import init.${ro.hardware}.usb.rc
 on init
     start watchdogd
 
+    # Freescale OMX core / VPU hardware codecs (stock init.rc exports). These must be
+    # in init's environment so mediaserver and every app process inherit them.
+    mkdir /mnt/shm 0775 system graphics
+    mount tmpfs tmpfs /mnt/shm mode=0775,uid=1000,gid=1003,size=1m
+    export SHM_MOUNTPOINT /mnt/shm
+    export CODEC_SHM_PATH /mnt/shm
+    export VPU_FW_PATH /system/lib/firmware/vpu
+    export CORE_REGISTER_FILE /system/etc/core_register
+    export COMPONENT_REGISTER_FILE /system/etc/component_register
+    export CONTENTPIPE_REGISTER_FILE /system/etc/contentpipe_register
+
     # Mount points used by the stock fstab / calibration scripts
     mkdir /device 0771 system system
     mkdir /factory 0771 system system
