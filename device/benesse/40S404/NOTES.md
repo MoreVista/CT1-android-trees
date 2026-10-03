@@ -57,6 +57,15 @@ Status (2026-10-03): boots, lockscreen/UI render on GPU (GLES2/HWUI), adb, WiFi 
 11. **Settings had no Wi-Fi entry** -- /system/etc/permissions feature XMLs (wifi,
    accelerometer, usb host/accessory, faketouch, touchscreen, location) were missing.
 
+12. **MTP showed no storage** -- MountService registered `/mnt/sdcard` (framework default,
+   non-existent) and vold, having no /system/etc/vold.fstab, auto-added an `sdcard`
+   volume at the same path => NPE "Error processing initial volume state". Fixed with
+   `overlay/.../storage_list.xml` (emulated primary /storage/sdcard0, SD slot, USB host)
+   and `vold.fstab` (stock sysfs paths). MTP needs `persist.sys.usb.config=mtp,adb`
+   (set via Settings > Storage > USB computer connection, or `setprop`).
+   Host note: gvfs-mtp grabbing the device makes the host adb server drop it;
+   unmount (`gio mount -u mtp://...`) and `adb kill-server; adb start-server`.
+
 ## Gotchas
 - Never `ctl.restart surfaceflinger` for experiments: system_server keeps a stale
   display token ("Attempt to blank null display", mDisplayReady=false).
