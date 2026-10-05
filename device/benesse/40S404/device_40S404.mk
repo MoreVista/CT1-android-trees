@@ -49,6 +49,13 @@ PRODUCT_PACKAGES += \
     hostapd_cli \
     wpa_cli
 
+# On-screen navigation bar (the tablet has hardware keys too, but they are few and
+# not labelled); persist.sys.fsl.hwrender=1 renders VPU-decoded video straight into
+# native window buffers (set 0 to fall back to CPU colour conversion).
+PRODUCT_PROPERTY_OVERRIDES += \
+    qemu.hw.mainkeys=0 \
+    persist.sys.fsl.hwrender=1
+
 # Dalvik heap sizing (values from the stock build.prop). Without these the VM
 # falls back to a 16 MB per-app heap and apps such as SkyTube die with OOM.
 PRODUCT_PROPERTY_OVERRIDES += \
