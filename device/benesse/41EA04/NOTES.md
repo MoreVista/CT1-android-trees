@@ -81,15 +81,18 @@ Status (2026-10-03): boots, lockscreen/UI render on GPU (GLES2/HWUI), adb, WiFi 
    they must be in init's environment so mediaserver AND app processes inherit them.
    Software H.264 (OMX.google, On2) is Baseline only and fails with STRM_ERR(-2) on High/Main-profile
    YouTube streams; the VPU decodes them.
-   **Rendering is done on the CPU**: `patches/frameworks_av-fsl-vpu-decode-sw-render.patch` treats
-   `OMX.Freescale.*` like `OMX.google.*` (no native window; AwesomeLocalRenderer / MediaCodec
-   SoftwareRenderer colour-convert and copy). The zero-copy path (decode straight into gralloc) was
-   brought up too (OMX->HAL colour-format map 19->0x101/21->0x103/22->0x100, minUndequeued=0 like stock,
-   BufferQueue min-undequeued check removed -- see `patches/frameworks_native-BufferQueue-*.patch`), and
-   decodes/renders the first frames, but MediaCodec/ACodec then deadlocks: its single looper blocks in
-   dequeueBuffer waiting for SurfaceFlinger to release the previous frame while the VPU is waiting for the
-   buffer back. Stock avoids this somehow (not found); the colour-format/BufferQueue pieces are kept
-   (harmless without a native window) for a later attempt.
+   **Rendering**: with `persist.sys.fsl.hwrender=1` (default) the VPU decodes straight into gralloc
+   buffers (zero copy). With 0, `OMX.Freescale.*` is treated like `OMX.google.*` (no native window;
+   AwesomeLocalRenderer / MediaCodec SoftwareRenderer colour-convert on the CPU). Zero-copy needed:
+   the OMX->HAL colour-format map (19->0x101, 21->0x103, 22->0x100, 6->RGB565), minUndequeued=0 like
+   stock (every buffer goes to the VPU), the BufferQueue min-undequeued check removed
+   (`patches/frameworks_native-BufferQueue-*.patch`), and holding back the refill after the *first*
+   rendered frame (ACodec/OMXCodec `mFslFirstRenderDone`): otherwise the single looper blocks in
+   dequeueBuffer waiting for SurfaceFlinger to release the previous frame while the VPU waits for a
+   buffer back (deadlock). All in `patches/frameworks_av-fsl-vpu-decode-sw-render.patch`.
+   Never swap libstagefright.so on a running system: zygote keeps the old mapping and every new app
+   dies with SIGSEGV at pc 0x463fc (the PLT0 stub). Reboot after live pushes.
+17. **Navigation bar** -- `qemu.hw.mainkeys=0`.
    Debug aids: /data/omx_log_level, /data/vpu_log_level (need mediaserver restart);
    `LOG_NDEBUG 0` at the top of ACodec.cpp/MediaCodec.cpp gives the full state machine.
 16. **build.prop is not regenerated when only product properties change** -- delete
