@@ -74,19 +74,26 @@ Status (2026-10-03): boots, lockscreen/UI render on GPU (GLES2/HWUI), adb, WiFi 
 14. **App OOM (SkyTube "playback error")** -- no dalvik.vm.heap* props, so the VM used its
    16 MB default heap. Added the stock values (heapgrowthlimit 64m, heapsize 384m...).
 
-15. **Hardware video decode (Freescale VPU)** -- ported the stock OMX stack:
+15. **Hardware video decode (Freescale VPU) + CPU render** -- ported the stock OMX stack:
    `lib_omx_*`, `libvpu`, `lib_vpu_wrapper`, `libstagefrighthw` (vendor `40S404-omx.mk`), VPU firmware
    (/system/lib/firmware/vpu), the three *_register files, the stock `media_codecs.xml`, and the init
    exports (CORE/COMPONENT/CONTENTPIPE_REGISTER_FILE, VPU_FW_PATH, SHM_MOUNTPOINT=/mnt/shm tmpfs) --
    they must be in init's environment so mediaserver AND app processes inherit them.
-   Needed framework patches (patches/): (a) `frameworks_av-fsl-native-color-format.patch` maps OMX
-   color formats to the i.MX gralloc formats (19->0x101, 21->0x103, 22->0x100, 6->RGB565) and, like stock,
-   hands *all* output buffers to the VPU (minUndequeuedBufs = 0); (b)
-   `frameworks_native-BufferQueue-no-min-undequeued-check.patch` removes the newer BufferQueue
-   "min undequeued buffer count exceeded" (-EBUSY) check that stock does not have.
-   Software H.264 (OMX.google, On2) is Baseline only and fails with STRM_ERR(-2) on High/Main
-   profile YouTube streams; the VPU decodes them.
-   Debug aids: /data/omx_log_level, /data/vpu_log_level (need mediaserver restart).
+   Software H.264 (OMX.google, On2) is Baseline only and fails with STRM_ERR(-2) on High/Main-profile
+   YouTube streams; the VPU decodes them.
+   **Rendering is done on the CPU**: `patches/frameworks_av-fsl-vpu-decode-sw-render.patch` treats
+   `OMX.Freescale.*` like `OMX.google.*` (no native window; AwesomeLocalRenderer / MediaCodec
+   SoftwareRenderer colour-convert and copy). The zero-copy path (decode straight into gralloc) was
+   brought up too (OMX->HAL colour-format map 19->0x101/21->0x103/22->0x100, minUndequeued=0 like stock,
+   BufferQueue min-undequeued check removed -- see `patches/frameworks_native-BufferQueue-*.patch`), and
+   decodes/renders the first frames, but MediaCodec/ACodec then deadlocks: its single looper blocks in
+   dequeueBuffer waiting for SurfaceFlinger to release the previous frame while the VPU is waiting for the
+   buffer back. Stock avoids this somehow (not found); the colour-format/BufferQueue pieces are kept
+   (harmless without a native window) for a later attempt.
+   Debug aids: /data/omx_log_level, /data/vpu_log_level (need mediaserver restart);
+   `LOG_NDEBUG 0` at the top of ACodec.cpp/MediaCodec.cpp gives the full state machine.
+16. **build.prop is not regenerated when only product properties change** -- delete
+   out/target/product/40S404/system/build.prop before `mka bacon` after editing PRODUCT_PROPERTY_OVERRIDES.
 
 ## Gotchas
 - Never `ctl.restart surfaceflinger` for experiments: system_server keeps a stale

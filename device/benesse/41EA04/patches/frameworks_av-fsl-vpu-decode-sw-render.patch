@@ -1,5 +1,5 @@
 diff --git a/media/libstagefright/ACodec.cpp b/media/libstagefright/ACodec.cpp
-index a9e344d03..71b228ded 100644
+index a9e344d03..2a14fdb4f 100644
 --- a/media/libstagefright/ACodec.cpp
 +++ b/media/libstagefright/ACodec.cpp
 @@ -540,6 +540,19 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
@@ -48,11 +48,55 @@ index a9e344d03..71b228ded 100644
          def.nBufferCountActual = newBufferCount;
          err = mOMX->setParameter(
                  mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
+@@ -3554,7 +3573,8 @@ bool ACodec::LoadedState::onConfigureComponent(
+ 
+     sp<RefBase> obj;
+     if (msg->findObject("native-window", &obj)
+-            && strncmp("OMX.google.", mCodec->mComponentName.c_str(), 11)) {
++            && strncmp("OMX.google.", mCodec->mComponentName.c_str(), 11)
++            && strncmp("OMX.Freescale.", mCodec->mComponentName.c_str(), 14)) {
+         sp<NativeWindowWrapper> nativeWindow(
+                 static_cast<NativeWindowWrapper *>(obj.get()));
+         CHECK(nativeWindow != NULL);
+diff --git a/media/libstagefright/AwesomePlayer.cpp b/media/libstagefright/AwesomePlayer.cpp
+index 1b1ba37da..8f7484897 100644
+--- a/media/libstagefright/AwesomePlayer.cpp
++++ b/media/libstagefright/AwesomePlayer.cpp
+@@ -1289,6 +1289,7 @@ void AwesomePlayer::initRenderer_l() {
+     if (USE_SURFACE_ALLOC
+             && !strncmp(component, "OMX.", 4)
+             && strncmp(component, "OMX.google.", 11)
++            && strncmp(component, "OMX.Freescale.", 14)
+             && strcmp(component, "OMX.Nvidia.mpeg2v.decode")) {
+         // Hardware decoders avoid the CPU color conversion by decoding
+         // directly to ANativeBuffers, so we must use a renderer that
+diff --git a/media/libstagefright/MediaCodec.cpp b/media/libstagefright/MediaCodec.cpp
+index 56e6df021..d5f8de77c 100644
+--- a/media/libstagefright/MediaCodec.cpp
++++ b/media/libstagefright/MediaCodec.cpp
+@@ -537,7 +537,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
+                     AString componentName;
+                     CHECK(msg->findString("componentName", &componentName));
+ 
+-                    if (componentName.startsWith("OMX.google.")) {
++                    if (componentName.startsWith("OMX.google.")
++                            || componentName.startsWith("OMX.Freescale.")) {
+                         mFlags |= kFlagIsSoftwareCodec;
+                     } else {
+                         mFlags &= ~kFlagIsSoftwareCodec;
 diff --git a/media/libstagefright/OMXCodec.cpp b/media/libstagefright/OMXCodec.cpp
-index 91ba0930b..d1571b185 100644
+index 91ba0930b..32bf259c2 100644
 --- a/media/libstagefright/OMXCodec.cpp
 +++ b/media/libstagefright/OMXCodec.cpp
-@@ -2070,6 +2070,19 @@ status_t OMXCodec::applyRotation() {
+@@ -1692,6 +1692,7 @@ OMXCodec::OMXCodec(
+       mPaused(false),
+       mNativeWindow(
+               (!strncmp(componentName, "OMX.google.", 11)
++              || !strncmp(componentName, "OMX.Freescale.", 14)
+               || !strcmp(componentName, "OMX.Nvidia.mpeg2v.decode"))
+                         ? NULL : nativeWindow)
+ #ifdef QCOM_HARDWARE
+@@ -2070,6 +2071,19 @@ status_t OMXCodec::applyRotation() {
      return err;
  }
  
@@ -72,7 +116,7 @@ index 91ba0930b..d1571b185 100644
  status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
      // Get the number of buffers needed.
      OMX_PARAM_PORTDEFINITIONTYPE def;
-@@ -2088,7 +2101,7 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
+@@ -2088,7 +2102,7 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
              mNativeWindow.get(),
              def.format.video.nFrameWidth,
              def.format.video.nFrameHeight,
@@ -81,7 +125,7 @@ index 91ba0930b..d1571b185 100644
  #else
      OMX_COLOR_FORMATTYPE eColorFormat;
  
-@@ -2176,8 +2189,14 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
+@@ -2176,8 +2190,14 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
      // XXX: Is this the right logic to use?  It's not clear to me what the OMX
      // buffer counts refer to - how do they account for the renderer holding on
      // to buffers?
