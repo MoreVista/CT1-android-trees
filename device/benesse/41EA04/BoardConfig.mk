@@ -88,3 +88,9 @@ BOARD_HOSTAPD_PRIVATE_LIB := lib_driver_cmd_bcmdhd
 WIFI_DRIVER_FW_PATH_PARAM := "/dev/null"
 
 TARGET_USES_LOGD := true
+
+# KitKat's libutils dropped the reserved VectorImpl/SortedVectorImpl virtuals that the
+# stock (4.2) blobs still reference; build them back in.
+# (target only: changing the host headers' class layout breaks host tools such as aapt)
+TARGET_GLOBAL_CFLAGS += -DNEEDS_VECTORIMPL_SYMBOLS
+TARGET_GLOBAL_CPPFLAGS += -DNEEDS_VECTORIMPL_SYMBOLS
