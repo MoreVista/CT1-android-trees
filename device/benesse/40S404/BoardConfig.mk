@@ -89,8 +89,6 @@ WIFI_DRIVER_FW_PATH_PARAM := "/dev/null"
 
 TARGET_USES_LOGD := true
 
-# KitKat's libutils dropped the reserved VectorImpl/SortedVectorImpl virtuals that the
-# stock (4.2) blobs still reference; build them back in.
-# (target only: changing the host headers' class layout breaks host tools such as aapt)
-TARGET_GLOBAL_CFLAGS += -DNEEDS_VECTORIMPL_SYMBOLS
-TARGET_GLOBAL_CPPFLAGS += -DNEEDS_VECTORIMPL_SYMBOLS
+# NOTE: the reserved VectorImpl symbols that the stock blobs reference are exported by
+# VectorImplShims.cpp (patches/system_core-libutils-vectorimpl-shims.patch). Do NOT use
+# -DNEEDS_VECTORIMPL_SYMBOLS: it shifts SortedVectorImpl::do_compare's vtable slot.

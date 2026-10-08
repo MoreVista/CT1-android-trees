@@ -1,8 +1,8 @@
 diff --git a/services/input/EventHub.cpp b/services/input/EventHub.cpp
-index 1c9520d28d..6f97ae6c0d 100644
+index 4d70d5f1..a82e7dfc 100644
 --- a/services/input/EventHub.cpp
 +++ b/services/input/EventHub.cpp
-@@ -301,6 +301,23 @@ status_t EventHub::getAbsoluteAxisInfo(int32_t deviceId, int axis,
+@@ -309,6 +309,23 @@ status_t EventHub::getAbsoluteAxisInfo(int32_t deviceId, int axis,
                  outAxisInfo->flat = info.flat;
                  outAxisInfo->fuzz = info.fuzz;
                  outAxisInfo->resolution = info.resolution;
