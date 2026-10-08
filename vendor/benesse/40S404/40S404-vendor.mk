@@ -9,6 +9,7 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/proprietary/lib/libGAL.so:system/lib/libGAL.so \
     $(LOCAL_PATH)/proprietary/lib/libGLSLC.so:system/lib/libGLSLC.so \
     $(LOCAL_PATH)/proprietary/lib/libg2d.so:system/lib/libg2d.so \
+    $(LOCAL_PATH)/proprietary/lib/libion.so:system/lib/libion.so \
     $(LOCAL_PATH)/proprietary/lib/libtinyfsl.so:system/lib/libtinyfsl.so \
     $(LOCAL_PATH)/proprietary/egl/libEGL_VIVANTE.so:system/lib/egl/libEGL_VIVANTE.so \
     $(LOCAL_PATH)/proprietary/egl/libGLESv1_CM_VIVANTE.so:system/lib/egl/libGLESv1_CM_VIVANTE.so \
@@ -27,7 +28,6 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/proprietary/etc/media_profiles.xml:system/etc/media_profiles.xml \
     $(LOCAL_PATH)/proprietary/etc/wifi/mlan.ko:system/etc/wifi/mlan.ko \
     $(LOCAL_PATH)/proprietary/etc/wifi/sd8787.ko:system/etc/wifi/sd8787.ko \
-    $(LOCAL_PATH)/proprietary/etc/wifi/wpa_supplicant.conf:system/etc/wifi/wpa_supplicant.conf \
     $(LOCAL_PATH)/proprietary/etc/firmware/mrvl/sd8787_uapsta.bin:system/etc/firmware/mrvl/sd8787_uapsta.bin \
     $(LOCAL_PATH)/proprietary/bin/mlaninit.sh:system/bin/mlaninit.sh \
     $(LOCAL_PATH)/proprietary/bin/mlanutl:system/bin/mlanutl \
