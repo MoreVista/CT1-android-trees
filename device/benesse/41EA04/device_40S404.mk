@@ -56,6 +56,9 @@ PRODUCT_PROPERTY_OVERRIDES += \
     qemu.hw.mainkeys=0 \
     persist.sys.fsl.hwrender=1
 
+# NOTE: build as cm_40S404-userdebug: eng forces ro.kernel.android.checkjni=1 (build/core/main.mk),
+# CheckJNI verifies every JNI call and is very slow on a Cortex-A9.
+
 # Dalvik heap sizing (values from the stock build.prop). Without these the VM
 # falls back to a 16 MB per-app heap and apps such as SkyTube die with OOM.
 PRODUCT_PROPERTY_OVERRIDES += \
