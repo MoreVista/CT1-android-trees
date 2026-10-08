@@ -1,8 +1,8 @@
 diff --git a/libs/gui/BufferQueue.cpp b/libs/gui/BufferQueue.cpp
-index acf6cec6c..0edd339e2 100644
+index f7b1bee07..d02c1f96d 100644
 --- a/libs/gui/BufferQueue.cpp
 +++ b/libs/gui/BufferQueue.cpp
-@@ -405,22 +405,9 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>& outFence,
+@@ -350,22 +350,9 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>* outFence, bool async
                  return -EINVAL;
              }
  
@@ -13,7 +13,7 @@ index acf6cec6c..0edd339e2 100644
 -                // make sure the client is not trying to dequeue more buffers
 -                // than allowed.
 -                const int newUndequeuedCount = maxBufferCount - (dequeuedCount+1);
--                const int minUndequeuedCount = getMinUndequeuedBufferCountLocked();
+-                const int minUndequeuedCount = getMinUndequeuedBufferCount(async);
 -                if (newUndequeuedCount < minUndequeuedCount) {
 -                    ST_LOGE("dequeueBuffer: min undequeued buffer count (%d) "
 -                            "exceeded (dequeued=%d undequeudCount=%d)",
