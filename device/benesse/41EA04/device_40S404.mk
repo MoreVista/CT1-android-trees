@@ -52,9 +52,12 @@ PRODUCT_PACKAGES += \
 # On-screen navigation bar (the tablet has hardware keys too, but they are few and
 # not labelled); persist.sys.fsl.hwrender=1 renders VPU-decoded video straight into
 # native window buffers (set 0 to fall back to CPU colour conversion).
+# ro.zygote.disable_gl_preload: zygote preloading GL (libGAL gcoSURF_Construct) SIGSEGVs on
+# the stock Vivante blobs under KitKat.
 PRODUCT_PROPERTY_OVERRIDES += \
     qemu.hw.mainkeys=0 \
-    persist.sys.fsl.hwrender=1
+    persist.sys.fsl.hwrender=1 \
+    ro.zygote.disable_gl_preload=true
 
 # NOTE: build as cm_40S404-userdebug: eng forces ro.kernel.android.checkjni=1 (build/core/main.mk),
 # CheckJNI verifies every JNI call and is very slow on a Cortex-A9.
@@ -74,3 +77,6 @@ PRODUCT_PROPERTY_OVERRIDES += \
     wifi.supplicant_scan_interval=15 \
     ro.carrier=wifi-only \
     ro.opengles.version=131072
+
+# Personal dev tablet: skip the adb RSA authorisation dialog (userdebug defaults to secure).
+ADDITIONAL_DEFAULT_PROPERTIES += ro.adb.secure=0
