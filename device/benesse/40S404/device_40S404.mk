@@ -78,9 +78,11 @@ PRODUCT_PROPERTY_OVERRIDES += \
 # Personal dev tablet: skip the adb RSA authorisation dialog (userdebug defaults to secure).
 ADDITIONAL_DEFAULT_PROPERTIES += ro.adb.secure=0
 
-# WebView: no prebuilt chromium-webview repos in this tree (they fail to sync), use the prebuilt
-# WebViewGoogle APK shared with the TAB-A03 port.
+# WebView: the prebuilt WebViewGoogle APK (webview/WebViewGoogle.apk, shared with the TAB-A03 port) is 79 MB on
+# /system, which does not fit the 504 MB system partition. Install it as a normal app after flashing instead:
+#   adb install -r device/benesse/40S404/webview/WebViewGoogle.apk
+# (com.google.android.webview is an available WebView provider in vendor/cm's config_webview_packages.xml).
+# The framework-side WebView loader/plat support libraries are still built into /system.
 PRODUCT_PACKAGES += \
-    WebViewGoogle \
     libwebviewchromium_loader \
     libwebviewchromium_plat_support
