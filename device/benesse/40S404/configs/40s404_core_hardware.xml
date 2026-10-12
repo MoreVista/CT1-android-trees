@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Features of the 40S404 tablet that are not covered by the individual
+     android.hardware.*.xml files copied in device_40S404.mk. -->
+<permissions>
+    <feature name="android.hardware.audio.output" />
+    <feature name="android.hardware.microphone" />
+    <feature name="android.hardware.screen.portrait" />
+    <feature name="android.hardware.screen.landscape" />
+
+    <!-- basic system services -->
+    <feature name="android.software.app_widgets" />
+    <feature name="android.software.backup" />
+    <feature name="android.software.device_admin" />
+    <feature name="android.software.home_screen" />
+    <feature name="android.software.input_methods" />
+    <feature name="android.software.live_wallpaper" />
+    <feature name="android.software.managed_users" />
+    <feature name="android.software.print" />
+    <feature name="android.software.voice_recognizers" />
+
+    <!-- Tablet: no calling / SMS -->
+    <unavailable-feature name="android.hardware.telephony" />
+</permissions>

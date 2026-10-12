@@ -1,0 +1,16 @@
+diff --git a/libs/binder/IPCThreadState.cpp b/libs/binder/IPCThreadState.cpp
+index 2296cd2..414185c 100644
+--- a/libs/binder/IPCThreadState.cpp
++++ b/libs/binder/IPCThreadState.cpp
+@@ -1190,3 +1190,11 @@ void IPCThreadState::freeBuffer(Parcel* parcel, const uint8_t* data,
+ }
+ 
+ }; // namespace android
++
++// 40S404: the stock (Android 4.2) gralloc_viv.imx6.so references the non-const
++// IPCThreadState::getCallingPid(); Lollipop made it const (different mangled name).
++extern "C" int fsl_ipcthreadstate_getCallingPid(const void* self)
++        __asm__("_ZN7android14IPCThreadState13getCallingPidEv");
++extern "C" int fsl_ipcthreadstate_getCallingPid(const void* self) {
++    return static_cast<const android::IPCThreadState*>(self)->getCallingPid();
++}

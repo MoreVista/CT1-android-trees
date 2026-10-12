@@ -30,6 +30,7 @@ PRODUCT_COPY_FILES += \
 # Hardware feature declarations (stock shipped these; without android.hardware.wifi
 # Settings hides the Wi-Fi entry entirely).
 PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/configs/40s404_core_hardware.xml:system/etc/permissions/40s404_core_hardware.xml \
     frameworks/native/data/etc/android.hardware.wifi.xml:system/etc/permissions/android.hardware.wifi.xml \
     frameworks/native/data/etc/android.hardware.sensor.accelerometer.xml:system/etc/permissions/android.hardware.sensor.accelerometer.xml \
     frameworks/native/data/etc/android.hardware.usb.host.xml:system/etc/permissions/android.hardware.usb.host.xml \

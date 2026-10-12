@@ -1,0 +1,19 @@
+diff --git a/core/jni/fd_utils-inl.h b/core/jni/fd_utils-inl.h
+index df880800..995ee1de 100644
+--- a/core/jni/fd_utils-inl.h
++++ b/core/jni/fd_utils-inl.h
+@@ -60,6 +60,14 @@ static const char* kPathWhitelist[] = {
+   "/system/framework/framework-res.apk",
+   "/dev/urandom",
+   "/dev/ion",
++  /* 40S404: Vivante GPU / i.MX devices that the EGL preload keeps open in the zygote */
++  "/dev/graphics/galcore",
++  "/dev/galcore",
++  "/dev/mxc_ipu",
++  "/dev/mxc_vpu",
++  "/dev/mxc_mem",
++  "/dev/mxs_viim",
++  "/dev/graphics/fb0",
+   "@netlink@",
+   "/system/framework/org.cyanogenmod.platform-res.apk",
+ #ifdef PATH_WHITELIST_EXTRA_H
