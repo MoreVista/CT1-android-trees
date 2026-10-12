@@ -1,0 +1,14 @@
+diff --git a/media/mediaserver/Android.mk b/media/mediaserver/Android.mk
+index fc807c0..7b70d90 100644
+--- a/media/mediaserver/Android.mk
++++ b/media/mediaserver/Android.mk
+@@ -26,7 +26,8 @@ LOCAL_SHARED_LIBRARIES := \
+ 	libutils \
+ 	liblog \
+ 	libbinder \
+-	libsoundtriggerservice
++	libsoundtriggerservice \
++	libjhead
+ 
+ LOCAL_STATIC_LIBRARIES := \
+ 	libregistermsext

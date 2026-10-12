@@ -1,0 +1,113 @@
+diff --git a/include/gui/BufferQueueProducer.h b/include/gui/BufferQueueProducer.h
+index c0c8e6d..305d85f 100644
+--- a/include/gui/BufferQueueProducer.h
++++ b/include/gui/BufferQueueProducer.h
+@@ -192,8 +192,10 @@ private:
+     // mode (producer and consumer controlled by the application). If it blocks,
+     // it will release mCore->mMutex while blocked so that other operations on
+     // the BufferQueue may succeed.
++    // 40S404: skipMinUndequeuedCheck is used for the Freescale VPU YUV formats.
+     status_t waitForFreeSlotThenRelock(const char* caller, bool async,
+-            int* found, status_t* returnFlags) const;
++            int* found, status_t* returnFlags,
++            bool skipMinUndequeuedCheck = false) const;
+ 
+     sp<BufferQueueCore> mCore;
+ 
+diff --git a/libs/binder/IPCThreadState.cpp b/libs/binder/IPCThreadState.cpp
+index 2296cd2..414185c 100644
+--- a/libs/binder/IPCThreadState.cpp
++++ b/libs/binder/IPCThreadState.cpp
+@@ -1190,3 +1190,11 @@ void IPCThreadState::freeBuffer(Parcel* parcel, const uint8_t* data,
+ }
+ 
+ }; // namespace android
++
++// 40S404: the stock (Android 4.2) gralloc_viv.imx6.so references the non-const
++// IPCThreadState::getCallingPid(); Lollipop made it const (different mangled name).
++extern "C" int fsl_ipcthreadstate_getCallingPid(const void* self)
++        __asm__("_ZN7android14IPCThreadState13getCallingPidEv");
++extern "C" int fsl_ipcthreadstate_getCallingPid(const void* self) {
++    return static_cast<const android::IPCThreadState*>(self)->getCallingPid();
++}
+diff --git a/libs/gui/BufferQueueProducer.cpp b/libs/gui/BufferQueueProducer.cpp
+index 6f76019..962b8d1 100644
+--- a/libs/gui/BufferQueueProducer.cpp
++++ b/libs/gui/BufferQueueProducer.cpp
+@@ -132,7 +132,8 @@ status_t BufferQueueProducer::setBufferCount(int bufferCount) {
+ }
+ 
+ status_t BufferQueueProducer::waitForFreeSlotThenRelock(const char* caller,
+-        bool async, int* found, status_t* returnFlags) const {
++        bool async, int* found, status_t* returnFlags,
++        bool skipMinUndequeuedCheck) const {
+     bool tryAgain = true;
+     while (tryAgain) {
+         if (mCore->mIsAbandoned) {
+@@ -192,13 +193,18 @@ status_t BufferQueueProducer::waitForFreeSlotThenRelock(const char* caller,
+         if (!mCore->mOverrideMaxBufferCount && dequeuedCount) {
+             BQ_LOGE("%s: can't dequeue multiple buffers without setting the "
+                     "buffer count", caller);
+-            return INVALID_OPERATION;
++            // 40S404: the stock Vivante EGL (built for JB 4.2) expects the pre-L error codes
++            return -EINVAL;
+         }
+ 
+         // See whether a buffer has been queued since the last
+         // setBufferCount so we know whether to perform the min undequeued
+         // buffers check below
+-        if (mCore->mBufferHasBeenQueued) {
++        // Freescale: the VPU decoder holds every buffer it is given (the stock, pre-JDQ39E
++        // BufferQueue had no such check), so the check is skipped for the FSL YUV formats
++        // (0x100-0x103). GL clients must keep it, otherwise they can dequeue every free
++        // buffer and then deadlock.
++        if (mCore->mBufferHasBeenQueued && !skipMinUndequeuedCheck) {
+             // Make sure the producer is not trying to dequeue more buffers
+             // than allowed
+             const int newUndequeuedCount =
+@@ -210,7 +216,7 @@ status_t BufferQueueProducer::waitForFreeSlotThenRelock(const char* caller,
+                         "(dequeued=%d undequeued=%d)",
+                         caller, minUndequeuedCount,
+                         dequeuedCount, newUndequeuedCount);
+-                return INVALID_OPERATION;
++                return -EBUSY;
+             }
+         }
+ 
+@@ -283,7 +289,7 @@ status_t BufferQueueProducer::dequeueBuffer(int *outSlot,
+ 
+         int found;
+         status_t status = waitForFreeSlotThenRelock("dequeueBuffer", async,
+-                &found, &returnFlags);
++                &found, &returnFlags, (format >= 0x100 && format <= 0x103));
+         if (status != NO_ERROR) {
+             return status;
+         }
+diff --git a/services/inputflinger/EventHub.cpp b/services/inputflinger/EventHub.cpp
+index dfe5d3d..f344a54 100644
+--- a/services/inputflinger/EventHub.cpp
++++ b/services/inputflinger/EventHub.cpp
+@@ -294,6 +294,23 @@ status_t EventHub::getAbsoluteAxisInfo(int32_t deviceId, int axis,
+                 outAxisInfo->flat = info.flat;
+                 outAxisInfo->fuzz = info.fuzz;
+                 outAxisInfo->resolution = info.resolution;
++
++                // Optional per-device override of the reported range from the
++                // .idc file (abs.<axis code>.min / abs.<axis code>.max). Needed
++                // for digitizers whose driver declares a wider range than the
++                // one they actually produce (e.g. rohm_bu21025 on 40S404).
++                if (device->configuration) {
++                    int32_t v;
++                    char key[32];
++                    snprintf(key, sizeof(key), "abs.%d.min", axis);
++                    if (device->configuration->tryGetProperty(String8(key), v)) {
++                        outAxisInfo->minValue = v;
++                    }
++                    snprintf(key, sizeof(key), "abs.%d.max", axis);
++                    if (device->configuration->tryGetProperty(String8(key), v)) {
++                        outAxisInfo->maxValue = v;
++                    }
++                }
+             }
+             return OK;
+         }
