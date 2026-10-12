@@ -1,3 +1,19 @@
+diff --git a/camera/Android.mk b/camera/Android.mk
+index 431f733..6d0213f 100644
+--- a/camera/Android.mk
++++ b/camera/Android.mk
+@@ -48,6 +48,11 @@ LOCAL_SHARED_LIBRARIES := \
+ 	libui \
+ 	libgui \
+ 	libcamera_metadata \
++	libjhead
++
++# 40S404: the stock camera.imx6.so (NEEDED libcamera_client) references jhead symbols
++# (ResetJpgfile, ...) without linking libjhead; keep it in DT_NEEDED so the dlopen resolves.
++LOCAL_LDFLAGS += -Wl,--no-as-needed
+ 
+ LOCAL_C_INCLUDES += \
+ 	system/media/camera/include \
 diff --git a/include/media/stagefright/ACodec.h b/include/media/stagefright/ACodec.h
 index 3ffac34..646c83c 100644
 --- a/include/media/stagefright/ACodec.h
