@@ -137,3 +137,39 @@ Flash via TWRP; install is only done when `/tmp/updater` has exited (verify md5 
 see patches/*.patch (frameworks_av, frameworks_native, frameworks_base EventHub, dalvik zygote fd whitelist,
 system_core VectorImpl shims). Also hand-edited: libutils Unicode.cpp, art/libnativehelper build fixes,
 build/tools/releasetools/edify_generator.py (set_perm instead of set_metadata).
+
+---
+# CM12.1 (Android 5.1.1, cm-12.1) port notes
+
+Tree: /mnt/hdd/40s404-cm12/src (repo init -b cm-12.1 --depth=1; prebuilts/tools and prebuilts/qemu-kernel are
+needed, external/qemu(+pc-bios) removed). Build: docker `cm11-build:14.04`, `lunch cm_40S404-userdebug`, `mka bacon`.
+Iteration shortcut: `adb root` (needs Settings > Developer options > Root access = Apps and ADB), `adb remount`,
+`adb push` the lib, reboot. Patches live in patches/*.patch (apply to the matching repo of the CM12.1 tree).
+
+## What had to change vs. CM11
+1. updater-script: Lollipop's updater has no set_perm; the default set_metadata_recursive (no selabel) works. Do NOT keep
+   the CM11 edify_generator patch.
+2. libutils: Lollipop's `reservedVectorImpl*` are `#ifdef NEEDS_VECTORIMPL_SYMBOLS` again -> same symbol shims as CM11
+   (patches/VectorImplShims.cpp + system_core-libutils-vectorimpl-shims.patch).
+3. libbinder: stock gralloc_viv.imx6.so needs the non-const IPCThreadState::getCallingPid() -> shim
+   (patches/frameworks_native-all-cm12.patch). Without it gralloc fails to dlopen -> every buffer alloc fails.
+4. libgui BufferQueueProducer: stock Vivante EGL expects the pre-L error codes (-EINVAL for "multiple dequeue without
+   buffer count", -EBUSY for min-undequeued); the min-undequeued check is skipped for the FSL YUV formats 0x100-0x103
+   (VPU video) only. Removing it for everything deadlocks GL clients (see CM11 notes).
+5. zygote fd whitelist (frameworks/base core/jni/fd_utils-inl.h), EventHub idc abs range (frameworks/native inputflinger).
+6. Feature XML (configs/40s404_core_hardware.xml): without android.software.app_widgets etc. system_server does not
+   start AppWidgetService and Trebuchet crashes.
+7. VPU: the VPU shared memory is at physical 0xddf84000 (> 2 GB); L's bionic mmap() rejects the negative 32-bit off_t.
+   BOARD_USES_LEGACY_MMAP := true (and touch bionic/libc/bionic/mmap.cpp - flag changes alone do not rebuild libc).
+8. Video: CM11 FSL patches ported to OMXCodec/ACodec/AwesomePlayer/MediaCodec (frameworks_av patch) incl. the
+   OMXNodeInstance GraphicBuffer+4 layout fix.
+9. Camera: camera.imx6.so needs libjhead in ITS OWN DT_NEEDED (L's linker only searches direct deps of a dlopen'd lib):
+   patched with `patchelf --add-needed libjhead.so` (vendor repo) + libcamera_client links libjhead.
+   STILL NOT WORKING: the stock HAL is a JB 4.2 camera2 (HAL2.0) implementation; MetadaManager::createStaticInfo fails
+   because 4.2's camera_metadata tag numbering differs from L's (e.g. tag 0x00020001 does not exist). Making it work needs a
+   new HAL1 (V4L2, sr200pc20 at /dev/video0) - there is no FSL HAL source in this tree.
+10. HWUI: the Vivante driver does not draw vertex-alpha (AA tessellated) round-rect fills -> Material dialog backgrounds
+    were fully transparent. OpenGLRenderer::drawRoundRect always uses the PathCache texture route
+    (patches/frameworks_base-hwui-roundrect-texture.patch).
+11. screencap is black/white (SurfaceFlinger GL read-back unsupported); to look at the screen use a framebuffer dumper
+    (open /dev/graphics/fb0, mmap, dump the page at yoffset; the pages repeat).
