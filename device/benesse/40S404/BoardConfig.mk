@@ -87,7 +87,6 @@ BOARD_WPA_SUPPLICANT_PRIVATE_LIB := lib_driver_cmd_bcmdhd
 BOARD_HOSTAPD_PRIVATE_LIB := lib_driver_cmd_bcmdhd
 WIFI_DRIVER_FW_PATH_PARAM := "/dev/null"
 
-TARGET_USES_LOGD := true
 
 # NOTE: the reserved VectorImpl symbols that the stock blobs reference are exported by
 # VectorImplShims.cpp (patches/system_core-libutils-vectorimpl-shims.patch). Do NOT use
@@ -96,3 +95,6 @@ TARGET_USES_LOGD := true
 # The VPU shared memory is at physical address 0xddf84000 (> 2 GB). Lollipop's bionic mmap()
 # rejects the (negative) 32-bit off_t that the stock libvpu passes; LEGACY_MMAP masks it as unsigned.
 BOARD_USES_LEGACY_MMAP := true
+
+# Android 7.1: stock 4.2 blobs may carry text relocations, keep them loadable.
+TARGET_NEEDS_PLATFORM_TEXT_RELOCATIONS := true

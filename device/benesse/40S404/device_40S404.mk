@@ -20,12 +20,10 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/ueventd.freescale.rc:root/ueventd.freescale.rc \
     $(LOCAL_PATH)/fstab.freescale:root/fstab.freescale \
     $(LOCAL_PATH)/wifi_load.sh:system/bin/wifi_load.sh \
-    $(LOCAL_PATH)/vold.fstab:system/etc/vold.fstab \
     $(LOCAL_PATH)/media_codecs.xml:system/etc/media_codecs.xml \
     $(LOCAL_PATH)/audio_init.sh:system/bin/audio_init.sh \
-    $(LOCAL_PATH)/idc/rohm_bu21025.idc:system/usr/idc/rohm_bu21025.idc \
-    system/core/rootdir/init.usb.rc:root/init.usb.rc \
-    system/core/rootdir/init.trace.rc:root/init.trace.rc
+    $(LOCAL_PATH)/idc/rohm_bu21025.idc:system/usr/idc/rohm_bu21025.idc
+
 
 # Hardware feature declarations (stock shipped these; without android.hardware.wifi
 # Settings hides the Wi-Fi entry entirely).
@@ -40,12 +38,10 @@ PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/android.hardware.location.xml:system/etc/permissions/android.hardware.location.xml
 
 PRODUCT_PACKAGES += \
-    Launcher2 \
     wpa_supplicant \
     wpa_supplicant.conf \
     dhcpcd.conf \
     hostapd \
-    wifi_tether \
     libwpa_client \
     hostapd_cli \
     wpa_cli
@@ -81,3 +77,10 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # Personal dev tablet: skip the adb RSA authorisation dialog (userdebug defaults to secure).
 ADDITIONAL_DEFAULT_PROPERTIES += ro.adb.secure=0
+
+# WebView: no prebuilt chromium-webview repos in this tree (they fail to sync), use the prebuilt
+# WebViewGoogle APK shared with the TAB-A03 port.
+PRODUCT_PACKAGES += \
+    WebViewGoogle \
+    libwebviewchromium_loader \
+    libwebviewchromium_plat_support
