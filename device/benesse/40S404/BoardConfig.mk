@@ -36,7 +36,7 @@ BOARD_MKBOOTIMG_ARGS := --ramdisk_offset 0x01000000 --tags_offset 0x00000100
 # mmcblk0: p1=boot p2=recovery p3=extended-container p4=data p5=system
 # p6=cache p7=device(content) p8=factory
 BOARD_BOOTIMAGE_PARTITION_SIZE     := 8388608
-BOARD_RECOVERYIMAGE_PARTITION_SIZE := 8388608
+BOARD_RECOVERYIMAGE_PARTITION_SIZE := 16777216   # not flashed (TWRP is the recovery); Nougat recovery exceeds the real 8 MB partition
 BOARD_SYSTEMIMAGE_PARTITION_SIZE   := 528482304
 BOARD_USERDATAIMAGE_PARTITION_SIZE := 13539213312
 BOARD_CACHEIMAGE_PARTITION_SIZE    := 528482304
