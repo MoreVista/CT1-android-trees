@@ -86,3 +86,8 @@ ADDITIONAL_DEFAULT_PROPERTIES += ro.adb.secure=0
 PRODUCT_PACKAGES += \
     libwebviewchromium_loader \
     libwebviewchromium_plat_support
+
+# Android 7 ART JIT: system_server dies with SEGV_ACCERR (0x64xxxxxx) right after PowerManagerService starts
+# on this 3.0.35 kernel. Interpreter + AOT only, until the JIT code cache is understood.
+PRODUCT_PROPERTY_OVERRIDES += \
+    dalvik.vm.usejit=false
