@@ -1,0 +1,79 @@
+diff --git a/init/init.cpp b/init/init.cpp
+index 7a37059..e18c1df 100755
+--- a/init/init.cpp
++++ b/init/init.cpp
+@@ -457,7 +457,10 @@ static selinux_enforcing_status selinux_status_from_cmdline() {
+ static bool selinux_is_enforcing(void)
+ {
+     if (ALLOW_PERMISSIVE_SELINUX) {
+-        return selinux_status_from_cmdline() == SELINUX_ENFORCING;
++        // TAB-A03: force permissive. The rootfs is labeled via fs_use_xattr
++        // but fresh files start unlabeled, so enforcing denies execv(/init).
++        (void)selinux_status_from_cmdline();
++        return false;
+     }
+     return true;
+ }
+@@ -500,9 +503,22 @@ static void security_failure() {
+     while (true) { pause(); }  // never reached
+ }
+ 
++// 40S404: the stock 3.0.35 kernel is built without SELinux (no selinuxfs). Android 7 init treats a
++// failed policy load as a security failure and reboots into recovery, so skip all SELinux setup there.
++static bool kernel_has_selinux() {
++    std::string filesystems;
++    if (!read_file("/proc/filesystems", &filesystems)) return true;
++    return filesystems.find("selinuxfs") != std::string::npos;
++}
++
+ static void selinux_initialize(bool in_kernel_domain) {
+     Timer t;
+ 
++    if (!kernel_has_selinux()) {
++        NOTICE("Kernel has no SELinux support; skipping policy load\n");
++        return;
++    }
++
+     selinux_callback cb;
+     cb.func_log = selinux_klog_callback;
+     selinux_set_callback(SELINUX_CB_LOG, cb);
+@@ -617,7 +633,7 @@ int main(int argc, char** argv) {
+     // If we're in the kernel domain, re-exec init to transition to the init domain now
+     // that the SELinux policy has been loaded.
+     if (is_first_stage) {
+-        if (restorecon("/init") == -1) {
++        if (kernel_has_selinux() && restorecon("/init") == -1) {
+             ERROR("restorecon failed: %s\n", strerror(errno));
+             security_failure();
+         }
+diff --git a/init/property_service.cpp b/init/property_service.cpp
+index fc14796..cc256f7 100644
+--- a/init/property_service.cpp
++++ b/init/property_service.cpp
+@@ -72,12 +72,26 @@ void property_init() {
+     }
+ }
+ 
++// 40S404: kernel without SELinux (no selinuxfs): there is no policy to ask, so allow everything.
++static bool kernel_has_selinux() {
++    static int cached = -1;
++    if (cached < 0) {
++        std::string filesystems;
++        cached = (!read_file("/proc/filesystems", &filesystems) ||
++                  filesystems.find("selinuxfs") != std::string::npos) ? 1 : 0;
++    }
++    return cached == 1;
++}
++
+ static int check_mac_perms(const char *name, char *sctx, struct ucred *cr)
+ {
+     char *tctx = NULL;
+     int result = 0;
+     property_audit_data audit_data;
+ 
++    if (!kernel_has_selinux())
++        return 1;
++
+     if (!sctx)
+         goto err;
+ 

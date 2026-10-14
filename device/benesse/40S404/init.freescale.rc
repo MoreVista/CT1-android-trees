@@ -27,22 +27,10 @@ on init
     mkdir /device 0771 system system
     mkdir /factory 0771 system system
 
-    # See storage config details at http://source.android.com/tech/storage/
-    mkdir /mnt/shell/emulated 0700 shell shell
-    mkdir /storage/emulated 0555 root root
-    mkdir /storage/extsd 0000 system system
-    mkdir /storage/udisk 0000 system system
-
-    export EXTERNAL_STORAGE /storage/emulated/legacy
-    export EXTERNAL_STORAGE_EXTSD /mnt/extsd
-    export EMULATED_STORAGE_SOURCE /mnt/shell/emulated
-    export EMULATED_STORAGE_TARGET /storage/emulated
-
-    # Support legacy paths
-    symlink /storage/emulated/legacy /sdcard
-    symlink /storage/emulated/legacy /mnt/sdcard
-    symlink /storage/emulated/legacy /storage/sdcard0
-    symlink /mnt/shell/emulated/0 /storage/emulated/legacy
+    # Storage (Android 7): /data/media emulated storage and the removable volumes are managed by vold
+    # (see fstab.freescale); init.rc already creates /mnt/runtime, /storage and the sdcard symlinks.
+    # Do NOT export EMULATED_STORAGE_TARGET/EXTERNAL_STORAGE here: ART's zygote would then try to mount a
+    # tmpfs on /storage/emulated.
 
 on post-fs-data
     # wpa_ctrl binds its client socket in here; without it the framework fails
@@ -126,15 +114,10 @@ on boot
 
     # Marvell sd8787 (SDIO WiFi) is loaded by the wifi_load service below.
 
-# Emulated internal storage (/sdcard -> /storage/emulated/legacy). Stock served
-# p7 (/eMMCp7/media); this uses /data/media on the much larger p4 instead.
 service audio_init /system/bin/audio_init.sh
     class late_start
     user root
     oneshot
-
-service sdcard /system/bin/sdcard -t4 /data/media /mnt/shell/emulated 1023 1023
-    class late_start
 
 # KitKat framework: a primary supplicant plus a separate p2p supplicant (WifiService
 # starts "p2p_supplicant" when P2P is enabled), both talking to the framework through
