@@ -1,3 +1,5 @@
+# NOTE: the stock power.imx6.so is NOT installed on Android 7: system_server crashes (SEGV_ACCERR) right
+# after PowerManagerService calls its init. The generic power.default is used instead.
 LOCAL_PATH := vendor/benesse/40S404
 
 # The generic audio HALs (policy/a2dp/usb/r_submix) are NOT taken from the 4.2 stock system:
@@ -22,7 +24,6 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/proprietary/hw/hwcomposer.imx6.so:system/lib/hw/hwcomposer.imx6.so \
     $(LOCAL_PATH)/proprietary/hw/hwcomposer_viv.imx6.so:system/lib/hw/hwcomposer_viv.imx6.so \
     $(LOCAL_PATH)/proprietary/hw/lights.imx6.so:system/lib/hw/lights.imx6.so \
-    $(LOCAL_PATH)/proprietary/hw/power.imx6.so:system/lib/hw/power.imx6.so \
     $(LOCAL_PATH)/proprietary/hw/sensors.SABRESD.so:system/lib/hw/sensors.SABRESD.so \
     $(LOCAL_PATH)/proprietary/etc/audio_policy.conf:system/etc/audio_policy.conf \
     $(LOCAL_PATH)/proprietary/etc/media_profiles.xml:system/etc/media_profiles.xml \
