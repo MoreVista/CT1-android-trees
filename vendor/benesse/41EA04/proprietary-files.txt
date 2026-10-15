@@ -1,5 +1,5 @@
-# Benesse 40S404 (i.MX6Q "bee01") proprietary blobs.
-# Extracted directly from the stock /system on the real unit (SN <40S404-twrp-serial>),
+# Benesse 41EA04 (i.MX6Q "bee01") proprietary blobs.
+# Extracted directly from the stock /system on the real unit (SN <41EA04-serial>),
 # 2026-10-01, via adb pull with root. See ../twrp-build-40s404.md (sibling
 # TWRP project) for how these were identified.
 

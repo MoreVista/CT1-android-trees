@@ -1,9 +1,9 @@
-LOCAL_PATH := vendor/benesse/40S404
+LOCAL_PATH := vendor/benesse/41EA04
 
 # The generic audio HALs (policy/a2dp/usb/r_submix) are NOT taken from the 4.2 stock system:
 # KitKat's AudioFlinger is not ABI compatible with them. They are built from source.
 
-$(call inherit-product, vendor/benesse/40S404/40S404-omx.mk)
+$(call inherit-product, vendor/benesse/41EA04/41EA04-omx.mk)
 
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/proprietary/lib/libGAL.so:system/lib/libGAL.so \

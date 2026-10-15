@@ -1,4 +1,4 @@
-LOCAL_PATH := vendor/benesse/40S404
+LOCAL_PATH := vendor/benesse/41EA04
 
 # Freescale OMX core + VPU hardware codecs (stock blobs). See NOTES.md in the device tree.
 PRODUCT_COPY_FILES += \
