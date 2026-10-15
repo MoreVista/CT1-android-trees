@@ -1,2 +1,2 @@
-add_lunch_combo cm_40S404-eng
-add_lunch_combo cm_40S404-userdebug
+add_lunch_combo cm_41EA04-eng
+add_lunch_combo cm_41EA04-userdebug

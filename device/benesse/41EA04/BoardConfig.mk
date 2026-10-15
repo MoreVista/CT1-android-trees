@@ -1,4 +1,4 @@
-DEVICE_PATH := device/benesse/40S404
+DEVICE_PATH := device/benesse/41EA04
 
 # Platform
 TARGET_BOOTLOADER_BOARD_NAME := SABRESD
@@ -26,6 +26,8 @@ ARCH_ARM_HAVE_TLS_REGISTER := true
 # prebuilt out-of-tree modules pulled from the stock /system with no
 # source in the GPL kernel dump, and would need to match the exact
 # kernel module ABI (vermagic) a rebuild might not reproduce.
+# 41EA04 ships its own 2014-01-20 kernel build (md5 00440868d5f69dbf1f6ace85a991c52e), NOT the 40S404 one.
+# Reused verbatim so the stock out-of-tree Wi-Fi modules (mlan/sd8787) keep matching its ABI.
 TARGET_PREBUILT_KERNEL := $(DEVICE_PATH)/prebuilt/zImage
 BOARD_KERNEL_CMDLINE := console=ttymxc0,115200 init=/init video=mxcfb0:dev=ldb,bpp=32 video=mxcfb1:off video=mxcfb2:off fbmem=10M fb0base=0x27b00000 vmalloc=400M androidboot.console=ttymxc0 androidboot.hardware=freescale
 BOARD_KERNEL_BASE := 0x10800000
@@ -38,7 +40,7 @@ BOARD_MKBOOTIMG_ARGS := --ramdisk_offset 0x01000000 --tags_offset 0x00000100
 BOARD_BOOTIMAGE_PARTITION_SIZE     := 8388608
 BOARD_RECOVERYIMAGE_PARTITION_SIZE := 8388608
 BOARD_SYSTEMIMAGE_PARTITION_SIZE   := 528482304
-BOARD_USERDATAIMAGE_PARTITION_SIZE := 13539213312
+BOARD_USERDATAIMAGE_PARTITION_SIZE := 14631829504
 BOARD_CACHEIMAGE_PARTITION_SIZE    := 528482304
 BOARD_CACHEIMAGE_FILE_SYSTEM_TYPE  := ext4
 BOARD_FLASH_BLOCK_SIZE := 131072
@@ -52,13 +54,13 @@ RECOVERY_SDCARD_ON_DATA := true
 # Graphics: Vivante GC350 (gc_hal_kernel source is in the GPL kernel dump
 # under drivers/mxc/gpu-viv, built from TARGET_KERNEL_SOURCE below; the
 # userspace libGAL/libEGL_VIVANTE/etc. are closed blobs pulled from stock
-# -- see vendor/benesse/40S404/proprietary-files.txt).
+# -- see vendor/benesse/41EA04/proprietary-files.txt).
 USE_OPENGL_RENDERER := true
 BOARD_EGL_CFG := $(DEVICE_PATH)/configs/egl.cfg
 TARGET_HARDWARE_3D := true
 
 # WiFi: Marvell sd8787 over SDIO, mlan.ko + sd8787.ko (out-of-tree, prebuilt,
-# loaded in that order -- see init.40S404.rc). Starting with NL80211 per
+# loaded in that order -- see init.41EA04.rc). Starting with NL80211 per
 # modern wpa_supplicant default; this chip/driver generation may turn out
 # to need WEXT instead -- revisit if wpa_supplicant fails to attach.
 #
@@ -71,7 +73,7 @@ TARGET_HARDWARE_3D := true
 # defines lib_driver_cmd_bcmdhd, see below) is a dead branch findleaves
 # never even reaches, and the build fails with "No rule to make target
 # lib_driver_cmd_bcmdhd". There is no mrvl equivalent in this tree. Actual
-# WiFi driver loading is fully custom (insmod in init.40S404.rc) and does
+# WiFi driver loading is fully custom (insmod in init.41EA04.rc) and does
 # not depend on this variable's usual meaning.
 BOARD_WLAN_DEVICE := bcmdhd
 WPA_SUPPLICANT_VERSION := VER_0_8_X

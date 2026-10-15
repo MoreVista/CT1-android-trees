@@ -1,6 +1,6 @@
-LOCAL_PATH := device/benesse/40S404
+LOCAL_PATH := device/benesse/41EA04
 
-$(call inherit-product, vendor/benesse/40S404/40S404-vendor.mk)
+$(call inherit-product, vendor/benesse/41EA04/41EA04-vendor.mk)
 
 DEVICE_PACKAGE_OVERLAYS := $(LOCAL_PATH)/overlay
 
@@ -24,6 +24,8 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/media_codecs.xml:system/etc/media_codecs.xml \
     $(LOCAL_PATH)/audio_init.sh:system/bin/audio_init.sh \
     $(LOCAL_PATH)/idc/rohm_bu21025.idc:system/usr/idc/rohm_bu21025.idc \
+    $(LOCAL_PATH)/idc/Novatek_NT11003_Touch_Screen.idc:system/usr/idc/Novatek_NT11003_Touch_Screen.idc \
+    $(LOCAL_PATH)/idc/Hanvon_electromagnetic_pen.idc:system/usr/idc/Hanvon_electromagnetic_pen.idc \
     system/core/rootdir/init.usb.rc:root/init.usb.rc \
     system/core/rootdir/init.trace.rc:root/init.trace.rc
 
@@ -59,7 +61,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
     persist.sys.fsl.hwrender=1 \
     ro.zygote.disable_gl_preload=true
 
-# NOTE: build as cm_40S404-userdebug: eng forces ro.kernel.android.checkjni=1 (build/core/main.mk),
+# NOTE: build as cm_41EA04-userdebug: eng forces ro.kernel.android.checkjni=1 (build/core/main.mk),
 # CheckJNI verifies every JNI call and is very slow on a Cortex-A9.
 
 # Dalvik heap sizing (values from the stock build.prop). Without these the VM

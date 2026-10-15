@@ -1,8 +1,8 @@
-# Device init for Benesse 40S404 (i.MX6, androidboot.hardware=freescale).
+# Device init for Benesse 41EA04 (i.MX6, androidboot.hardware=freescale).
 # Ported from the stock ramdisk's init.freescale.rc. The file name matters:
 # init.rc does `import /init.${ro.hardware}.rc` and the kernel cmdline sets
 # androidboot.hardware=freescale, so a file named after the product
-# (init.40S404.rc) is never read. Without this file nothing mounts /system
+# (init.41EA04.rc) is never read. Without this file nothing mounts /system
 # or /data (mount_all below is the only place that happens) and
 # init.freescale.usb.rc never configures the USB gadget, so the device
 # boots "blind": no display, no adb, no UART output after init starts.
@@ -24,7 +24,6 @@ on init
     export CONTENTPIPE_REGISTER_FILE /system/etc/contentpipe_register
 
     # Mount points used by the stock fstab / calibration scripts
-    mkdir /device 0771 system system
     mkdir /factory 0771 system system
 
     # See storage config details at http://source.android.com/tech/storage/
