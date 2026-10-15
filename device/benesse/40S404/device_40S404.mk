@@ -54,7 +54,10 @@ PRODUCT_PACKAGES += \
 PRODUCT_PROPERTY_OVERRIDES += \
     qemu.hw.mainkeys=0 \
     persist.sys.fsl.hwrender=1 \
-    ro.zygote.disable_gl_preload=true
+    ro.zygote.disable_gl_preload=true \
+    debug.hwui.render_dirty_regions=false
+# debug.hwui.render_dirty_regions=false: the Vivante EGL does not keep the previous frame
+# (EGL_SWAP_BEHAVIOR_PRESERVED), so HWUI partial redraw flickers; redraw whole frames.
 
 # NOTE: build as cm_40S404-userdebug: eng forces ro.kernel.android.checkjni=1 (build/core/main.mk),
 # CheckJNI verifies every JNI call and is very slow on a Cortex-A9.

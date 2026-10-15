@@ -1,0 +1,16 @@
+diff --git a/cmds/installd/commands.cpp b/cmds/installd/commands.cpp
+index cadcd1e..2f5e77e 100644
+--- a/cmds/installd/commands.cpp
++++ b/cmds/installd/commands.cpp
+@@ -109,6 +109,11 @@ static int restorecon_app_data_lazy(const std::string& path, const char* seinfo,
+     char* before = nullptr;
+     char* after = nullptr;
+ 
++    // 40S404: kernel without SELinux -> no labels to restore (lgetfilecon would fail with ENOTSUP).
++    if (is_selinux_enabled() <= 0) {
++        return 0;
++    }
++
+     // Note that SELINUX_ANDROID_RESTORECON_DATADATA flag is set by
+     // libselinux. Not needed here.
+ 
