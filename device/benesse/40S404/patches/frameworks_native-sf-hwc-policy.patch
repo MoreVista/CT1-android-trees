@@ -1,8 +1,20 @@
 diff --git a/services/surfaceflinger/SurfaceFlinger_hwc1.cpp b/services/surfaceflinger/SurfaceFlinger_hwc1.cpp
-index e0b2d55..29c8682 100644
+index e0b2d55..f163ee6 100644
 --- a/services/surfaceflinger/SurfaceFlinger_hwc1.cpp
 +++ b/services/surfaceflinger/SurfaceFlinger_hwc1.cpp
-@@ -3353,6 +3353,10 @@ status_t SurfaceFlinger::onTransact(
+@@ -185,6 +185,11 @@ SurfaceFlinger::SurfaceFlinger()
+     property_get("debug.sf.showupdates", value, "0");
+     mDebugRegion = atoi(value);
+ 
++    // The stock Freescale v_hwc blit composition corrupts the screen on N; composite every
++    // layer with GLES unless ro.sf.use_hwc=1.
++    property_get("ro.sf.use_hwc", value, "0");
++    mDebugDisableHWC = !atoi(value);
++
+     property_get("debug.sf.ddms", value, "0");
+     mDebugDDMS = atoi(value);
+     if (mDebugDDMS) {
+@@ -3353,6 +3358,10 @@ status_t SurfaceFlinger::onTransact(
                  } else {
                      mColorMatrix = mat4();
                  }
@@ -13,7 +25,7 @@ index e0b2d55..29c8682 100644
                  invalidateHwcGeometry();
                  repaintEverything();
                  return NO_ERROR;
-@@ -3403,6 +3407,10 @@ status_t SurfaceFlinger::onTransact(
+@@ -3403,6 +3412,10 @@ status_t SurfaceFlinger::onTransact(
                  } else {
                      mSecondaryColorMatrix = mat4();
                  }
