@@ -1,0 +1,26 @@
+diff --git a/services/surfaceflinger/SurfaceFlinger_hwc1.cpp b/services/surfaceflinger/SurfaceFlinger_hwc1.cpp
+index e0b2d55..29c8682 100644
+--- a/services/surfaceflinger/SurfaceFlinger_hwc1.cpp
++++ b/services/surfaceflinger/SurfaceFlinger_hwc1.cpp
+@@ -3353,6 +3353,10 @@ status_t SurfaceFlinger::onTransact(
+                 } else {
+                     mColorMatrix = mat4();
+                 }
++                // An identity matrix is "no transform": do not force every layer onto GLES.
++                if (mHasColorMatrix && mColorMatrix == mat4()) {
++                    mHasColorMatrix = 0;
++                }
+                 invalidateHwcGeometry();
+                 repaintEverything();
+                 return NO_ERROR;
+@@ -3403,6 +3407,10 @@ status_t SurfaceFlinger::onTransact(
+                 } else {
+                     mSecondaryColorMatrix = mat4();
+                 }
++                // LiveDisplay always sends its calibration matrix, even when it is the identity.
++                if (mHasSecondaryColorMatrix && mSecondaryColorMatrix == mat4()) {
++                    mHasSecondaryColorMatrix = 0;
++                }
+                 invalidateHwcGeometry();
+                 repaintEverything();
+                 return NO_ERROR;
