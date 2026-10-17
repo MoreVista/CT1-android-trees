@@ -201,3 +201,25 @@ host stuck, `adb kill-server` and retry. After a reboot adbd is non-root again.
 6. Misleading numbers: `top` shows ~25-50 % IOW at idle (ipu1_task kthreads sit in D state) and load average
    ~5; `adb shell screencap` is all-black (GL readback); with CM ROMs the 41EA04 reports the same adb serial
    (0123456789ABCDEF) -- always select the device by `adb -t <transport_id>` after checking ro.product.device.
+
+### v_hwc (hardware composer) corruption -- investigation log (2026-10-17)
+
+Tooling: `/dev/graphics/fb0` is readable as root; a tiny static C tool (`fbcap`, built with the tree's
+arm-linux-androideabi-gcc + ndk android-10 sysroot) reads `FBIOGET_VSCREENINFO.yoffset` and copies the page
+that is actually displayed (yres_virtual=2304 = 3 pages); frames converted with PIL (BGRA). This beats
+screencap (all black). Capture ~24 frames while swiping the launcher.
+Do NOT toggle HWC at run time (`service call SurfaceFlinger 1008`): it left apps with
+"dequeueBuffer: attempting to exceed the max dequeued buffer count (2)" -> EGL_BAD_NATIVE_WINDOW ->
+HWUI "halting rendering" (frozen Launcher/StatusBar). Use ro.sf.use_hwc=1 + reboot for experiments.
+
+Symptom with ro.sf.use_hwc=1: in ~5-8 % of frames of a scrolling animation the composed frame (as stored in
+the displayed fb page) has horizontal bands from different frames: wallpaper polygon edges notched at a
+fixed y, launcher icon labels clipped. Static screens, Settings scrolling and GLES composition are clean.
+The displayed page is never modified after flip (checked with `fbmut`), so the tear is inside the composed
+result, not scan-out.
+Facts about hwcomposer_viv.imx6.so: no sync_wait import (acquire fences ignored); g2d_finish() of the
+blits is deferred to the next compose (flag at ctx+172); it has Area/owners bookkeeping.
+Tried without effect: debug.egl.finish=1; Layer maxAcquiredBufferCount=2; forcing HWC_GEOMETRY_CHANGED
+every frame. Marking only the wallpaper SKIP makes v_hwc fall back to GLES for *all* layers (no hybrid).
+Conclusion: keep GLES composition (ro.sf.use_hwc unset); resolving the tear needs reverse engineering of
+hwcComposeG2D (Area splitting) or a replacement HWC.
