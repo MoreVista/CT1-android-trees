@@ -171,3 +171,22 @@ service wifi_reset /system/bin/wifi_reset.sh
 service cp_calib /system/bin/copy_calib.sh
     class late_start
     oneshot
+
+# su daemon (WITH_SU). This init does not read /system/etc/init, so it is declared here.
+# Gated by persist.sys.root_access (Settings -> Developer options -> Root access).
+service su_daemon /system/xbin/su --daemon
+    user root
+    group root
+    disabled
+
+on property:persist.sys.root_access=0
+    stop su_daemon
+
+on property:persist.sys.root_access=2
+    stop su_daemon
+
+on property:persist.sys.root_access=1
+    start su_daemon
+
+on property:persist.sys.root_access=3
+    start su_daemon

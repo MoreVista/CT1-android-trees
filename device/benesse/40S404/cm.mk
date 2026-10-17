@@ -1,3 +1,6 @@
+# Build /system/xbin/su (Settings -> Developer options -> Root access gates it) for debugging.
+WITH_SU := true
+
 # AOSP base package set (as the TAB-A03 LOS 14.1 port does).
 $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base.mk)
 
