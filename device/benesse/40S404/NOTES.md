@@ -173,3 +173,31 @@ Iteration shortcut: `adb root` (needs Settings > Developer options > Root access
     (patches/frameworks_base-hwui-roundrect-texture.patch).
 11. screencap is black/white (SurfaceFlinger GL read-back unsupported); to look at the screen use a framebuffer dumper
     (open /dev/graphics/fb0, mmap, dump the page at yoffset; the pages repeat).
+
+## LineageOS 14.1 (7.1.2) -- performance / graphics findings
+
+Debug root: `WITH_SU := true` (cm.mk) + `su_daemon` service in init.freescale.rc (this init does not read
+/system/etc/init). `adb root` works (adbd is patched for the SELinux-less kernel); if `adb root` leaves the
+host stuck, `adb kill-server` and retry. After a reboot adbd is non-root again.
+
+1. **UI slow (~10 fps)** -- LiveDisplay (night colour temperature) sends a non-identity colour matrix to
+   SurfaceFlinger (transaction 1030); `SurfaceFlinger_hwc1.cpp` then marks every layer HWC_SKIP_LAYER and
+   composites all on the GC880 with an extra colour shader. Fix: `overlay/vendor/cmsdk/.../config.xml`
+   (LiveDisplay off by default) and `patches/frameworks_native-sf-hwc-policy.patch` (identity matrix = none).
+2. **Screen corruption with HWC enabled** -- the stock Freescale v_hwc blit composition corrupts the screen on
+   N. SurfaceFlinger now composites with GLES unless `ro.sf.use_hwc=1` (same patch). Cost: ~26-36 ms/frame
+   scrolling Settings vs ~9 ms with v_hwc.
+3. **App cold start ~3 s** -- libEGL's Loader::init_api() asked the Vivante eglGetProcAddress() for ~8700 names
+   per process; every unanswered call dlopen()s (libGAL gcoOS_LoadLibrary) and Android 7's linker does ~50
+   mprotect() per dlopen (found with `strace -f -tt` on the app: 55k mprotect, 457 dlopen of libGLESv1_CM.so).
+   The only names it resolved beyond dlsym() were 49 unadvertised stubs (APPLE/NV/QCOM/IMG). Fix:
+   `patches/frameworks_native-libegl-loader.patch` (dlsym only; `debug.egl.use_gpa=1` restores the old
+   behaviour). Settings 3.6 s -> 1.4 s, Calculator 3.0 s -> 1.3 s.
+4. **zygote GL preload still impossible** (`ro.zygote.disable_gl_preload=true` stays): the Vivante libs open
+   /dev/galcore in a static constructor, so the zygote's galcore fd/GAL state is shared with every forked child
+   and a Vivante thread in system_server dies with SIGSEGV (fault addr 0x903100) ~20 s after start.
+5. ART is NOT the bottleneck: `cmd package compile -m speed` on Calculator changed nothing; JIT stays off.
+   /system is 96 % full, so no system-wide dexpreopt anyway.
+6. Misleading numbers: `top` shows ~25-50 % IOW at idle (ipu1_task kthreads sit in D state) and load average
+   ~5; `adb shell screencap` is all-black (GL readback); with CM ROMs the 41EA04 reports the same adb serial
+   (0123456789ABCDEF) -- always select the device by `adb -t <transport_id>` after checking ro.product.device.
