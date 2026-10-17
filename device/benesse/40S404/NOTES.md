@@ -275,7 +275,7 @@ the murder-suicide), so `crashpc` (ptrace + PTRACE_O_TRACECLONE, prints regs/sta
 Known limit: the VPU buffers come from the 176 MB galcore pool; after many playbacks the pool can be exhausted
 ("_IOGetPhyMem: gpu allocator failed") until reboot.
 
-### v_hwc retry (2026-10-18) -- STATUS: promising, soak test unfinished
+### v_hwc retry (2026-10-18) -- STATUS: shipped (HWC composition is the default)
 Cause of the banded tears: Vivante's eglSwapBuffers queues the frame before its resolve into the window buffer has
 finished on the 3D core; v_hwc then blits it with the 2D core (no fences). Torn bands are always the previous frame's
 content (about -32 px). Fix: SurfaceFlinger waits for the (process-shared) 3D queue before hwc.commit(): EGL fence
@@ -286,3 +286,10 @@ device freeze during a capture run; cause unproven, hence the bounded wait.) Det
 fb0 captures, see fbcap/runcap in the session notes).  NOT DONE: finish the 15-minute soak (sendevent swipes + drawer
 opens, heartbeat file), rebuild the zip (the last zip still has the GLES-composition default), re-check screenshots/video
 under HWC.
+
+Final check on the flashed zip (6f6473d7...): 15-min soak (22 rounds of swipes + drawer opens) without a freeze;
+Settings scroll median 8 ms / 0.5 % janky, Launcher swipe median 5 ms / 0.1 % janky; tear detector 3 flagged
+frames out of 144 (~2 %, one-frame bands); Recents thumbnails and video playback (VPU) fine under HWC.
+Fallback: `ro.sf.use_hwc=0` in /system/build.prop forces GLES composition (slow but tear-free).
+Residual tears probably come from producers that submit the resolve after queueBuffer; a second barrier after the
+layer latch would be the next thing to try.
