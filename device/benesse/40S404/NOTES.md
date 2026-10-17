@@ -223,3 +223,15 @@ Tried without effect: debug.egl.finish=1; Layer maxAcquiredBufferCount=2; forcin
 every frame. Marking only the wallpaper SKIP makes v_hwc fall back to GLES for *all* layers (no hybrid).
 Conclusion: keep GLES composition (ro.sf.use_hwc unset); resolving the tear needs reverse engineering of
 hwcComposeG2D (Area splitting) or a replacement HWC.
+
+## LineageOS 14.1 -- flashing / release checklist (2026-10-17)
+
+* Flash: `adb reboot recovery` (TWRP, serial <40S404-twrp-serial>) -> `adb push <zip> /data/los14.zip` -> `twrp install /data/los14.zip`
+  -> `twrp wipe dalvik` -> reboot. The first boot after an OTA takes ~5-10 min (installd dex2oat of the
+  framework jars); do not judge it before sys.boot_completed.
+* **make never deletes stale files from `out/target/product/40S404/system`.** A leftover `lib/hw/power.imx6.so`
+  (stock power HAL, removed from the vendor makefile long ago) ended up in the first full image and made
+  system_server die with SEGV_ACCERR right after PowerManagerService init ("SWITCHPROFILE ... Power HAL" in
+  logcat is the tell-tale). Delete stale output files after removing something from a makefile, then rebuild.
+* WebView: `adb install webview/WebViewGoogle.apk` (user app, not part of the image; /system is 96 % full).
+* The kernel cmdline is plain again (no user_debug, no init=/init); u-boot appends ~88 chars, total < 300.
