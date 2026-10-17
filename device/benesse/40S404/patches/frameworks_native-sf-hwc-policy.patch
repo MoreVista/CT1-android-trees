@@ -1,20 +1,83 @@
+diff --git a/services/surfaceflinger/RenderEngine/RenderEngine.cpp b/services/surfaceflinger/RenderEngine/RenderEngine.cpp
+index 28b3319..6e8fc9a 100644
+--- a/services/surfaceflinger/RenderEngine/RenderEngine.cpp
++++ b/services/surfaceflinger/RenderEngine/RenderEngine.cpp
+@@ -218,6 +218,24 @@ void RenderEngine::fillRegionWithColor(const Region& region, uint32_t height,
+     drawMesh(mesh);
+ }
+ 
++void RenderEngine::finish() {
++    glFinish();
++}
++
++// Wait for the GPU queue to drain, but never longer than timeoutNs.  Returns true if it drained.
++bool RenderEngine::finishWithTimeout(int64_t timeoutNs) {
++    EGLDisplay dpy = eglGetCurrentDisplay();
++    if (dpy == EGL_NO_DISPLAY) return false;
++    EGLSyncKHR sync = eglCreateSyncKHR(dpy, EGL_SYNC_FENCE_KHR, NULL);
++    if (sync == EGL_NO_SYNC_KHR) {
++        return false;
++    }
++    EGLint r = eglClientWaitSyncKHR(dpy, sync, EGL_SYNC_FLUSH_COMMANDS_BIT_KHR,
++            static_cast<EGLTimeKHR>(timeoutNs));
++    eglDestroySyncKHR(dpy, sync);
++    return r == EGL_CONDITION_SATISFIED_KHR;
++}
++
+ void RenderEngine::flush() {
+     glFlush();
+ }
+diff --git a/services/surfaceflinger/RenderEngine/RenderEngine.h b/services/surfaceflinger/RenderEngine/RenderEngine.h
+index 3f1953c..e1f5145 100644
+--- a/services/surfaceflinger/RenderEngine/RenderEngine.h
++++ b/services/surfaceflinger/RenderEngine/RenderEngine.h
+@@ -73,6 +73,8 @@ public:
+ 
+     // helpers
+     void flush();
++    void finish();
++    bool finishWithTimeout(int64_t timeoutNs);
+     void clearWithColor(float red, float green, float blue, float alpha);
+     void fillRegionWithColor(const Region& region, uint32_t height,
+             float red, float green, float blue, float alpha);
 diff --git a/services/surfaceflinger/SurfaceFlinger_hwc1.cpp b/services/surfaceflinger/SurfaceFlinger_hwc1.cpp
-index e0b2d55..f163ee6 100644
+index e0b2d55..500e28e 100644
 --- a/services/surfaceflinger/SurfaceFlinger_hwc1.cpp
 +++ b/services/surfaceflinger/SurfaceFlinger_hwc1.cpp
-@@ -185,6 +185,11 @@ SurfaceFlinger::SurfaceFlinger()
+@@ -185,6 +185,12 @@ SurfaceFlinger::SurfaceFlinger()
      property_get("debug.sf.showupdates", value, "0");
      mDebugRegion = atoi(value);
  
-+    // The stock Freescale v_hwc blit composition corrupts the screen on N; composite every
-+    // layer with GLES unless ro.sf.use_hwc=1.
-+    property_get("ro.sf.use_hwc", value, "0");
++    // The stock Freescale v_hwc (2D blit) composition is ~4x faster than GLES composition on the GC880,
++    // but it reads producer buffers whose 3D resolve may still be running (see the glFinish() before
++    // hwc.commit()).  ro.sf.use_hwc=0 forces GLES composition for every layer.
++    property_get("ro.sf.use_hwc", value, "1");
 +    mDebugDisableHWC = !atoi(value);
 +
      property_get("debug.sf.ddms", value, "0");
      mDebugDDMS = atoi(value);
      if (mDebugDDMS) {
-@@ -3353,6 +3358,10 @@ status_t SurfaceFlinger::onTransact(
+@@ -1415,6 +1421,19 @@ void SurfaceFlinger::postFramebuffer()
+             //    for the current rendering API."
+             getDefaultDisplayDevice()->makeCurrent(mEGLDisplay, mEGLContext);
+         }
++        {
++            // 40S404: the Vivante EGL queues a frame before its resolve into the window buffer has
++            // finished on the 3D core, and v_hwc then blits it with the 2D core (no fences) ->
++            // bands of the previous frame. The 3D command queue is shared by all processes, so a
++            // glFinish() here waits for every producer's pending work before v_hwc reads it.
++            static const bool glFinishBeforeCommit = property_get_bool("ro.sf.hwc_gl_finish", true);
++            if (glFinishBeforeCommit) {
++                getDefaultDisplayDevice()->makeCurrent(mEGLDisplay, mEGLContext);
++                if (!getRenderEngine().finishWithTimeout(ms2ns(30))) {
++                    ALOGW_IF(false, "GPU did not drain within 30 ms before the HWC commit");
++                }
++            }
++        }
+         hwc.commit();
+     }
+ 
+@@ -3353,6 +3372,10 @@ status_t SurfaceFlinger::onTransact(
                  } else {
                      mColorMatrix = mat4();
                  }
@@ -25,7 +88,7 @@ index e0b2d55..f163ee6 100644
                  invalidateHwcGeometry();
                  repaintEverything();
                  return NO_ERROR;
-@@ -3403,6 +3412,10 @@ status_t SurfaceFlinger::onTransact(
+@@ -3403,6 +3426,10 @@ status_t SurfaceFlinger::onTransact(
                  } else {
                      mSecondaryColorMatrix = mat4();
                  }
