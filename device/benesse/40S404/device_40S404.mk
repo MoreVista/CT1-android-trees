@@ -56,7 +56,11 @@ PRODUCT_PROPERTY_OVERRIDES += \
     persist.sys.fsl.hwrender=1 \
     ro.zygote.disable_gl_preload=true \
     debug.hwui.render_dirty_regions=false \
-    ro.bq.gpu_to_cpu_unsupported=1
+    ro.bq.gpu_to_cpu_unsupported=1 \
+    ro.bq.dequeue_wait_ms=100
+# ro.bq.dequeue_wait_ms=100: BufferQueueProducer waits up to 100 ms for an in-flight queueBuffer before failing a
+# dequeue with "attempting to exceed the max dequeued buffer count"; the Vivante EGL dequeues the next buffer
+# before the previous queue has landed, and a failed dequeue froze apps (HWUI halting rendering).
 # ro.bq.gpu_to_cpu_unsupported=1: SurfaceFlinger screenshots (screencap, Recents thumbnails) rendered all-zero
 # buffers through the EGLImage FBO path on the Vivante driver; this makes it use glReadPixels instead.
 # debug.hwui.render_dirty_regions=false: the Vivante EGL does not keep the previous frame

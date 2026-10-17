@@ -1,0 +1,35 @@
+diff --git a/libs/hwui/renderthread/CanvasContext.cpp b/libs/hwui/renderthread/CanvasContext.cpp
+index 975ac836..e3942473 100644
+--- a/libs/hwui/renderthread/CanvasContext.cpp
++++ b/libs/hwui/renderthread/CanvasContext.cpp
+@@ -556,7 +556,17 @@ void CanvasContext::draw() {
+ 
+     if (drew || mEglManager.damageRequiresSwap()) {
+         if (CC_UNLIKELY(!mEglManager.swapBuffers(frame, screenDirty))) {
++            // 40S404: the Vivante EGL occasionally leaks dequeued buffers, so queueBuffer/dequeueBuffer
++            // fails with BAD_NATIVE_WINDOW although the window is fine and the UI would stay frozen
++            // forever. Re-create the EGL surface (this disconnects the producer and frees the buffers).
++            sp<Surface> surf = mNativeSurface;
+             setSurface(nullptr);
++            if (surf.get() && ++mSwapFailureStreak <= 3) {
++                ALOGW("swapBuffers failed, re-creating the EGL surface (%d)", mSwapFailureStreak);
++                setSurface(surf.get());
++            }
++        } else {
++            mSwapFailureStreak = 0;
+         }
+         SwapHistory& swap = mSwapHistory.next();
+         swap.damage = screenDirty;
+diff --git a/libs/hwui/renderthread/CanvasContext.h b/libs/hwui/renderthread/CanvasContext.h
+index e1821751..7382c991 100644
+--- a/libs/hwui/renderthread/CanvasContext.h
++++ b/libs/hwui/renderthread/CanvasContext.h
+@@ -220,6 +220,8 @@ private:
+ #endif
+ 
+     bool mHaveNewSurface = false;
++
++    int mSwapFailureStreak = 0;
+     DamageAccumulator mDamageAccumulator;
+     LayerUpdateQueue mLayerUpdateQueue;
+     std::unique_ptr<AnimationContext> mAnimationContext;

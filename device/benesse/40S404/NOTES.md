@@ -235,3 +235,18 @@ hwcComposeG2D (Area splitting) or a replacement HWC.
   logcat is the tell-tale). Delete stale output files after removing something from a makefile, then rebuild.
 * WebView: `adb install webview/WebViewGoogle.apk` (user app, not part of the image; /system is 96 % full).
 * The kernel cmdline is plain again (no user_debug, no init=/init); u-boot appends ~88 chars, total < 300.
+
+### App freezes: "attempting to exceed the max dequeued buffer count" (2026-10-17)
+
+Symptom: opening the Launcher's all-apps list froze the Launcher (no redraw). Log: `BufferQueueProducer: [..Launcher]
+dequeueBuffer: attempting to exceed the max dequeued buffer count (2)` followed by HWUI `swapBuffers encountered EGL error
+12299 ... halting rendering...`; HWUI then drops the surface for good. Reproduced in ~25 % of drawer opens
+(`sendevent` tap loop, see drawer3.sh idea: tap 512,672 / tap 512,744 with 0.8 s sleeps; `input tap` itself spawns a JVM
+and drives the 800 MB device into the low-memory killer, which makes the test meaningless).
+Cause: the Vivante EGL dequeues the next buffer before the previous frame's queueBuffer has landed in SurfaceFlinger, so
+for a moment 3 buffers are dequeued; maxDequeued is 2. Raising maxDequeued to 3 does not help (still fails).
+Fixes: (1) `ro.bq.dequeue_wait_ms=100` -- libgui BufferQueueProducer waits for the in-flight queue instead of failing
+(patches/frameworks_native-bq-dequeue-wait.patch, also contains an inactive `ro.bq.min_max_dequeued` clamp);
+result 0 failures / 100 opens. (2) HWUI safety net: on a failed swap re-create the EGL surface instead of dropping it
+(patches/frameworks_base-hwui-swap-recover.patch).
+The producer side runs inside surfaceflinger, so libgui changes need a reboot (zygote restart is not enough).
