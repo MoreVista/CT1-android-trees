@@ -55,7 +55,10 @@ PRODUCT_PROPERTY_OVERRIDES += \
     qemu.hw.mainkeys=0 \
     persist.sys.fsl.hwrender=1 \
     ro.zygote.disable_gl_preload=true \
-    debug.hwui.render_dirty_regions=false
+    debug.hwui.render_dirty_regions=false \
+    ro.bq.gpu_to_cpu_unsupported=1
+# ro.bq.gpu_to_cpu_unsupported=1: SurfaceFlinger screenshots (screencap, Recents thumbnails) rendered all-zero
+# buffers through the EGLImage FBO path on the Vivante driver; this makes it use glReadPixels instead.
 # debug.hwui.render_dirty_regions=false: the Vivante EGL does not keep the previous frame
 # (EGL_SWAP_BEHAVIOR_PRESERVED), so HWUI partial redraw flickers; redraw whole frames.
 
