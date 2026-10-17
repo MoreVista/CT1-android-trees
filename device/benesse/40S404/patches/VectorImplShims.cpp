@@ -21,3 +21,16 @@ SHIM(vecimpl_shim12, "_ZN7android16SortedVectorImpl25reservedSortedVectorImpl5Ev
 SHIM(vecimpl_shim13, "_ZN7android16SortedVectorImpl25reservedSortedVectorImpl6Ev")
 SHIM(vecimpl_shim14, "_ZN7android16SortedVectorImpl25reservedSortedVectorImpl7Ev")
 SHIM(vecimpl_shim15, "_ZN7android16SortedVectorImpl25reservedSortedVectorImpl8Ev")
+
+/*
+ * The 4.2 blobs (lib_id3_parser, pulled in when the FSL OMX core loads lib_omx_vpu_dec) call
+ * String8::setTo(unsigned short const*, unsigned int); since the char16_t change the symbol is
+ * ...setToEPKDsj, so dlopen() of the whole VPU decoder chain failed ("cannot locate symbol").
+ */
+#include <utils/String8.h>
+extern "C" int string8_setto_ushort_shim(android::String8* self, const unsigned short* other,
+        unsigned int numChars) __asm__("_ZN7android7String85setToEPKtj");
+extern "C" int string8_setto_ushort_shim(android::String8* self, const unsigned short* other,
+        unsigned int numChars) {
+    return self->setTo(reinterpret_cast<const char16_t*>(other), numChars);
+}

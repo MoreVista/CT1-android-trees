@@ -1,0 +1,100 @@
+diff --git a/media/libstagefright/ACodec.cpp b/media/libstagefright/ACodec.cpp
+index a11494d..66fe408 100644
+--- a/media/libstagefright/ACodec.cpp
++++ b/media/libstagefright/ACodec.cpp
+@@ -1967,6 +1967,36 @@ status_t ACodec::configureCodec(
+     sp<RefBase> obj;
+     bool haveNativeWindow = msg->findObject("native-window", &obj)
+             && obj != NULL && video && !encoder;
++
++    // TAB_A03_BS: the Marvell video decoder blobs (OMX.MARVELL.VIDEO.*) do not implement
++    // the AOSP gralloc/native-window OMX extensions this ACodec needs -- both
++    //   getExtensionIndex("OMX.google.android.index.storeMetaDataInBuffers")
++    //   getExtensionIndex("OMX.google.android.index.enableAndroidNativeBuffers")
++    // return OMX_ErrorBadParameter, so configureCodec() bails out with
++    // "configureCodec returning error -2147483648" and NuPlayer gives up on the video
++    // entirely (MediaPlayer error (1, -2147483648)) rather than retrying in software.
++    // Stock ran Marvell's own stagefright, which never asked for these.
++    // Force these components down the same route as the OMX.google software codecs:
++    // decode in hardware into CPU-readable ByteBuffers and let NuPlayer's
++    // SoftwareRenderer blit to the Surface. Unlike 5.1, the whole native-window
++    // configuration block below runs BEFORE the usingSwRenderer decision further down,
++    // so the choice has to be made here or the failing calls happen anyway.
++    // Protected (DRM) playback is left alone: it requires a native window by definition
++    // and these blobs cannot do secure decode regardless.
++    int32_t protectedContent = 0;
++    // 40S404: the stock Freescale VPU components (OMX.Freescale.*) cannot be handed raw OMX colour
++    // formats as native-window formats (gralloc rejects them: dequeueBuffer ENOMEM) -- use the same
++    // CPU-readable output + SoftwareRenderer route until the zero-copy path is ported.
++    const bool forceSwRenderer = haveNativeWindow
++            && (mComponentName.startsWith("OMX.MARVELL.")
++                || mComponentName.startsWith("OMX.Freescale."))
++            && !(msg->findInt32("protected", &protectedContent) && protectedContent);
++    if (forceSwRenderer) {
++        ALOGI("[%s] no gralloc-output OMX extensions; using software renderer",
++                mComponentName.c_str());
++        haveNativeWindow = false;
++    }
++
+     mUsingNativeWindow = haveNativeWindow;
+     mLegacyAdaptiveExperiment = false;
+     if (video && !encoder) {
+@@ -2143,8 +2173,12 @@ status_t ACodec::configureCodec(
+     if (video) {
+         // determine need for software renderer
+         bool usingSwRenderer = false;
+-        if (haveNativeWindow && (mComponentName.startsWith("OMX.google.") ||
+-                                 mComponentName.startsWith("OMX.ffmpeg."))) {
++        if (forceSwRenderer) {
++            // TAB_A03_BS: already decided above (haveNativeWindow was cleared there so the
++            // native-window block would not run the OMX extension calls these blobs reject).
++            usingSwRenderer = true;
++        } else if (haveNativeWindow && (mComponentName.startsWith("OMX.google.") ||
++                                        mComponentName.startsWith("OMX.ffmpeg."))) {
+             usingSwRenderer = true;
+             haveNativeWindow = false;
+         }
+@@ -5091,8 +5125,13 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
+                     CHECK(mIsEncoder ^ (portIndex == kPortIndexOutput));
+                     notify->setString("mime", MEDIA_MIMETYPE_VIDEO_RAW);
+ 
+-                    notify->setInt32("stride", videoDef->nStride);
+-                    notify->setInt32("slice-height", videoDef->nSliceHeight);
++                    // 40S404: the stock FSL VPU decoder advertises stride/slice-height 0 on its output
++                    // port; SoftwareRenderer then places the chroma planes at offset 0 (= the luma data).
++                    notify->setInt32("stride",
++                            videoDef->nStride != 0 ? videoDef->nStride : videoDef->nFrameWidth);
++                    notify->setInt32("slice-height",
++                            videoDef->nSliceHeight != 0 ? videoDef->nSliceHeight
++                                                        : videoDef->nFrameHeight);
+                     notify->setInt32("color-format", videoDef->eColorFormat);
+ 
+                     if (mNativeWindow == NULL) {
+diff --git a/media/libstagefright/omx/OMXMaster.cpp b/media/libstagefright/omx/OMXMaster.cpp
+index 2d2d500..9326560 100644
+--- a/media/libstagefright/omx/OMXMaster.cpp
++++ b/media/libstagefright/omx/OMXMaster.cpp
+@@ -30,7 +30,23 @@
+ 
+ namespace android {
+ 
++// 40S404: the stock Freescale VPU stack (libvpu -> g2d_alloc -> gcoOS_AllocateVideoMemory) assumes
++// the Vivante GAL device was already constructed in the process hosting the OMX components
++// (on 4.2 something in mediaserver did that); in the mediacodec process nobody does, and libGAL
++// dereferences a NULL gcoOS (fault addr 0x10). Open a g2d context once to construct it.
++static void fslInitGal() {
++    static void *sG2dHandle = NULL;
++    if (sG2dHandle != NULL) return;
++    void *lib = dlopen("libg2d.so", RTLD_NOW | RTLD_GLOBAL);
++    if (lib == NULL) return;
++    int (*g2dOpen)(void **) = reinterpret_cast<int (*)(void **)>(dlsym(lib, "g2d_open"));
++    if (g2dOpen != NULL && g2dOpen(&sG2dHandle) != 0) {
++        sG2dHandle = NULL;
++    }
++}
++
+ OMXMaster::OMXMaster() {
++    fslInitGal();
+ 
+     mProcessName[0] = 0;
+     if (mProcessName[0] == 0) {

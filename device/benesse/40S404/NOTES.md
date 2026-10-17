@@ -250,3 +250,27 @@ Fixes: (1) `ro.bq.dequeue_wait_ms=100` -- libgui BufferQueueProducer waits for t
 result 0 failures / 100 opens. (2) HWUI safety net: on a failed swap re-create the EGL surface instead of dropping it
 (patches/frameworks_base-hwui-swap-recover.patch).
 The producer side runs inside surfaceflinger, so libgui changes need a reboot (zygote restart is not enough).
+
+### Video playback (FSL VPU) on N (2026-10-17)
+
+Result: H.264 (320x240, 848x480) plays through the VPU decoder `OMX.Freescale.std.video_decoder.avc.v3.hw-based`
+with CPU rendering (ACodec software-renderer route), ~28 fps for 480p at ~27 % CPU. Zero-copy (native window, HAL
+formats 0x100-0x103, persist.sys.fsl.hwrender=1) is NOT ported to N; 720p+ is untested.
+Why it did not work, in order (each hid the next):
+1. AOSP 7.1 MediaCodecList instantiates every XML codec once (QueryCapabilities) and drops the ones that fail, silently
+   -> all OMX.Freescale.* vanished and OMX.google.* (software) was used. Look for `FAILED to allocate omx component`.
+2. dlopen of the VPU chain failed: lib_id3_parser needs `String8::setTo(unsigned short const*, unsigned)` (char16_t
+   mangling changed) -> shim in libutils/VectorImplShims.cpp.
+3. The components run in the `media.codec` process (uid mediacodec) which could not open /dev/mxc_vpu and /dev/ion
+   (0660 media:system) -> ueventd.freescale.rc 0666.
+4. libvpu calls g2d_alloc -> gcoOS_AllocateVideoMemory without constructing the Vivante GAL; in media.codec nobody did
+   (SIGSEGV, fault addr 0x10 in libGAL) -> OMXMaster calls g2d_open() once (fslInitGal).
+5. ACodec: FSL components cannot take the native-window route (gralloc rejects the raw OMX colour format, ENOMEM) ->
+   treat OMX.Freescale.* like OMX.MARVELL.* (forceSwRenderer).
+6. The decoder advertises stride/slice-height 0 -> SoftwareRenderer put the chroma planes at offset 0 (garbage grid) ->
+   fall back to nFrameWidth/nFrameHeight in ACodec::getPortFormat.
+Tools that made this possible: `debuggerd` is useless on this kernel (its worker times out; the waitpid patch only stops
+the murder-suicide), so `crashpc` (ptrace + PTRACE_O_TRACECLONE, prints regs/stack/maps at SIGSEGV) located the crash;
+`debug.ld.all=dlerror` shows the real dlopen error; `setprop debug.stagefright.omx-debug 5` traces OMX calls.
+Known limit: the VPU buffers come from the 176 MB galcore pool; after many playbacks the pool can be exhausted
+("_IOGetPhyMem: gpu allocator failed") until reboot.
