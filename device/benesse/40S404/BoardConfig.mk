@@ -27,7 +27,7 @@ ARCH_ARM_HAVE_TLS_REGISTER := true
 # source in the GPL kernel dump, and would need to match the exact
 # kernel module ABI (vermagic) a rebuild might not reproduce.
 TARGET_PREBUILT_KERNEL := $(DEVICE_PATH)/prebuilt/zImage
-BOARD_KERNEL_CMDLINE := console=ttymxc0,115200 user_debug=31 video=mxcfb0:dev=ldb,bpp=32 video=mxcfb1:off video=mxcfb2:off fbmem=10M fb0base=0x27b00000 vmalloc=400M androidboot.console=ttymxc0 androidboot.hardware=freescale
+BOARD_KERNEL_CMDLINE := console=ttymxc0,115200 video=mxcfb0:dev=ldb,bpp=32 video=mxcfb1:off video=mxcfb2:off fbmem=10M fb0base=0x27b00000 vmalloc=400M androidboot.console=ttymxc0 androidboot.hardware=freescale
 BOARD_KERNEL_BASE := 0x10800000
 BOARD_KERNEL_PAGESIZE := 2048
 BOARD_MKBOOTIMG_ARGS := --ramdisk_offset 0x01000000 --tags_offset 0x00000100

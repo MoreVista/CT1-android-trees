@@ -47,12 +47,12 @@ index 7a37059..e18c1df 100755
              security_failure();
          }
 diff --git a/init/property_service.cpp b/init/property_service.cpp
-index fc14796..cc256f7 100644
+index fc14796..79bf069 100644
 --- a/init/property_service.cpp
 +++ b/init/property_service.cpp
-@@ -72,12 +72,26 @@ void property_init() {
-     }
- }
+@@ -65,8 +65,23 @@ static int persistent_properties_loaded = 0;
+ 
+ static int property_set_fd = -1;
  
 +// 40S404: kernel without SELinux (no selinuxfs): there is no policy to ask, so allow everything.
 +static bool kernel_has_selinux() {
@@ -65,9 +65,17 @@ index fc14796..cc256f7 100644
 +    return cached == 1;
 +}
 +
- static int check_mac_perms(const char *name, char *sctx, struct ucred *cr)
- {
-     char *tctx = NULL;
+ void property_init() {
+-    if (__system_property_area_init()) {
++    int ret = __system_property_area_init();
++    // 40S404: without SELinux in the kernel fsetxattr(security.selinux) always fails; bionic reports
++    // that as -2 (area created fine, just unlabelled). Only treat it as fatal if SELinux is present.
++    if (ret == -2 && !kernel_has_selinux()) ret = 0;
++    if (ret) {
+         ERROR("Failed to initialize property area\n");
+         exit(1);
+     }
+@@ -78,6 +93,9 @@ static int check_mac_perms(const char *name, char *sctx, struct ucred *cr)
      int result = 0;
      property_audit_data audit_data;
  
@@ -76,4 +84,72 @@ index fc14796..cc256f7 100644
 +
      if (!sctx)
          goto err;
+ 
+diff --git a/init/service.cpp b/init/service.cpp
+index a5334f4..6da107d 100644
+--- a/init/service.cpp
++++ b/init/service.cpp
+@@ -344,7 +344,9 @@ bool Service::Start() {
+     }
+ 
+     std::string scon;
+-    if (!seclabel_.empty()) {
++    if (!init_kernel_has_selinux()) {
++        // 40S404: kernel without SELinux, nothing to compute.
++    } else if (!seclabel_.empty()) {
+         scon = seclabel_;
+     } else {
+         char* mycon = nullptr;
+@@ -454,7 +456,7 @@ bool Service::Start() {
+                 _exit(127);
+             }
+         }
+-        if (!seclabel_.empty()) {
++        if (!seclabel_.empty() && init_kernel_has_selinux()) {
+             if (setexeccon(seclabel_.c_str()) < 0) {
+                 ERROR("cannot setexeccon('%s'): %s\n",
+                       seclabel_.c_str(), strerror(errno));
+diff --git a/init/util.cpp b/init/util.cpp
+index 193b783..58696dd 100755
+--- a/init/util.cpp
++++ b/init/util.cpp
+@@ -92,6 +92,16 @@ unsigned int decode_uid(const char *s) {
+     return v;
+ }
+ 
++bool init_kernel_has_selinux() {
++    static int cached = -1;
++    if (cached < 0) {
++        std::string filesystems;
++        cached = (!read_file("/proc/filesystems", &filesystems) ||
++                  filesystems.find("selinuxfs") != std::string::npos) ? 1 : 0;
++    }
++    return cached == 1;
++}
++
+ /*
+  * create_socket - creates a Unix domain socket in ANDROID_SOCKET_DIR
+  * ("/dev/socket") as dictated in init.rc. This socket is inherited by the
+@@ -105,6 +115,8 @@ int create_socket(const char *name, int type, mode_t perm, uid_t uid,
+     int fd, ret, savederrno;
+     char *filecon;
+ 
++    if (!init_kernel_has_selinux()) socketcon = NULL;
++
+     if (socketcon) {
+         if (setsockcreatecon(socketcon) == -1) {
+             ERROR("setsockcreatecon(\"%s\") failed: %s\n", socketcon, strerror(errno));
+diff --git a/init/util.h b/init/util.h
+index 695b94c..43ac78d 100755
+--- a/init/util.h
++++ b/init/util.h
+@@ -28,6 +28,9 @@
+ #define COLDBOOT_DONE "/dev/.coldboot_done"
+ 
+ int mtd_name_to_number(const char *name);
++// 40S404: false on kernels built without SELinux (no selinuxfs in /proc/filesystems).
++bool init_kernel_has_selinux();
++
+ int create_socket(const char *name, int type, mode_t perm,
+                   uid_t uid, gid_t gid, const char *socketcon);
  
