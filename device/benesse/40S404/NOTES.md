@@ -275,21 +275,24 @@ the murder-suicide), so `crashpc` (ptrace + PTRACE_O_TRACECLONE, prints regs/sta
 Known limit: the VPU buffers come from the 176 MB galcore pool; after many playbacks the pool can be exhausted
 ("_IOGetPhyMem: gpu allocator failed") until reboot.
 
-### v_hwc retry (2026-10-18) -- STATUS: shipped (HWC composition is the default)
-Cause of the banded tears: Vivante's eglSwapBuffers queues the frame before its resolve into the window buffer has
-finished on the 3D core; v_hwc then blits it with the 2D core (no fences). Torn bands are always the previous frame's
-content (about -32 px). Fix: SurfaceFlinger waits for the (process-shared) 3D queue before hwc.commit(): EGL fence
-with a 30 ms cap (RenderEngine::finishWithTimeout; `ro.sf.hwc_gl_finish`, default on). HWC composition is now the
-default (`ro.sf.use_hwc`, default 1). Tear rate 4 % -> ~1 % of animation frames; Settings scroll median 8 ms, Launcher
-swipe median 5 ms (GLES composition: 26-36 ms).  (An earlier unbounded glFinish() version was followed by one full
-device freeze during a capture run; cause unproven, hence the bounded wait.) Detector: tear4.py (row-shift test on
-fb0 captures, see fbcap/runcap in the session notes).  NOT DONE: finish the 15-minute soak (sendevent swipes + drawer
-opens, heartbeat file), rebuild the zip (the last zip still has the GLES-composition default), re-check screenshots/video
-under HWC.
-
-Final check on the flashed zip (6f6473d7...): 15-min soak (22 rounds of swipes + drawer opens) without a freeze;
-Settings scroll median 8 ms / 0.5 % janky, Launcher swipe median 5 ms / 0.1 % janky; tear detector 3 flagged
-frames out of 144 (~2 %, one-frame bands); Recents thumbnails and video playback (VPU) fine under HWC.
-Fallback: `ro.sf.use_hwc=0` in /system/build.prop forces GLES composition (slow but tear-free).
-Residual tears probably come from producers that submit the resolve after queueBuffer; a second barrier after the
-layer latch would be the next thing to try.
+### v_hwc retry (2026-10-18/19) -- STATUS: root cause found and fixed (HWC composition is the default)
+**Real root cause: pan/vsync race.** v_hwc composes into one of two fb pages (yoffset 0/768 of a 3-page
+yres_virtual=2304) and calls FBIOPAN_DISPLAY. On this IPU/MXC fb (kernel 3.0.35) the pan only takes effect at the *next
+vsync* (panel period 17.84 ms), and the ioctl returns earlier. If SurfaceFlinger starts composing the next frame
+immediately, v_hwc blits into the page that is still being scanned out -> the visible "old picture / shifted band"
+flicker. (strace -f -tt -T of surfaceflinger plus reading drivers/video/mxc/mxc_ipuv3_fb.c made this visible; the
+GLES path goes through the fb HAL which waits, hence no flicker there.)
+Fix (`patches/frameworks_native-sf-hwc-policy.patch`): after `hwc.commit()` SurfaceFlinger calls
+`MXCFB_WAIT_FOR_VSYNC` (`_IOR('F', 0x20, unsigned long long)`) on /dev/graphics/fb0 (fslWaitPanVsync,
+`ro.sf.hwc_wait_vsync`, default on). The user confirmed the flicker is gone and scrolling is acceptable.
+Earlier, weaker mitigation kept as is: a bounded GPU barrier before `hwc.commit()` (EGL fence, 30 ms cap,
+RenderEngine::finishWithTimeout, `ro.sf.hwc_gl_finish`, default on). It reduced some 3D-resolve-vs-2D-blit banding
+but was NOT the cause of the flicker; it may be unnecessary now (unverified). An unbounded glFinish() once preceded a
+full device freeze, hence the bound.
+**Caveat on measurements:** the "tear rates" from fb-page sampling (fbcap/tear4.py) were partly artifacts: reading a
+3 MB page slowly while it is being rewritten tears the *capture*. Do not trust them; use strace/kernel reading.
+HWC composition is the default (`ro.sf.use_hwc`, default 1); fallback `ro.sf.use_hwc=0` in /system/build.prop forces
+GLES composition (slow, 26-36 ms/frame vs ~5-9 ms, but tear-free). Do NOT toggle HWC at run time.
+Tools used (sources only in the session; `tools/sftest` is the EGL solid-colour client): fbcap (page capture),
+crashpc (ptrace SIGSEGV dumper), strace of surfaceflinger. Avoid `input tap/swipe` on the device (spawns a JVM and
+drives it into LMK); use sendevent scripts.
