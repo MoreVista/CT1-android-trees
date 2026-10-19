@@ -331,3 +331,4 @@ fills up after ~10 plays (force-stop style tests): galcore then SIGKILLs apps ("
 SurfaceFlinger (`setprop ctl.restart surfaceflinger`) gives the memory back, killing media.codec/mediaserver does not.
 Test clips: gst-launch videotestsrc (ball) + x264enc (profile=high), see /tmp in the session; `dumpsys media.player` shows
 numFramesTotal/numFramesDropped; panel pages can be dumped with `cat /dev/graphics/fb0` (3 pages of 1024x768 RGBA).
+Flashed 2026-10-20: lineage-14.1-20261019-UNOFFICIAL-40S404.zip (with zero-copy video); 720p/1080p/240p/480p verified, 0 drops.
