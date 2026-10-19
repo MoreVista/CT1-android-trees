@@ -300,3 +300,34 @@ drives it into LMK); use sendevent scripts.
 ### Final validation (2026-10-19)
 Zip lineage-14.1-20261019-UNOFFICIAL-40S404 (sha256 ce01a541...a80b) flashed via TWRP. User-verified on the tablet: no flicker
 (HWC composition with pan-vsync wait), scrolling OK, audio, SD card / MTP and sensors work. Open: camera, zero-copy/720p+ video.
+
+### Zero-copy video decode (FSL VPU -> gralloc -> v_hwc) on N (2026-10-20)
+Result: H.264 1080p30 plays with 0-8 % late frames (was 65 % dropped with CPU copy), 720p 0-5 %, CPU mostly idle (the
+VPU decodes straight into gralloc buffers, v_hwc scales/blits them with the 2D core). `persist.sys.fsl.hwrender`
+(default 1; 0 = old CPU/SoftwareRenderer route) is read when the codec is configured, so it can be flipped without reboot.
+Patches: `frameworks_av-fsl-vpu-swrender-n.patch` (ACodec/OMXNodeInstance) and `frameworks_native-bq-dequeue-wait.patch`
+(BufferQueueProducer). What was needed, in order:
+1. ACodec: raw OMX colour formats are mapped to the i.MX gralloc formats (19->0x101, 21->0x103, 22->0x100); the
+   forceSwRenderer route is skipped for OMX.Freescale.* when hwrender=1.
+2. OMXNodeInstance::useGraphicBuffer: the stock OMX wrapper expects the JB-4.2 GraphicBuffer layout and recovers the
+   buffer with "ptr - 4" -> hand it `ptr + 4` (same trick as on CM12).
+3. The VPU registers its frame buffers only when it has been given ALL nBufferCountActual output buffers (fillBuffer for
+   every one; holding back minUndequeued for the window = decoder silently stalls, no FBD ever). So the FSL path sets
+   minUndequeued=0 (everything goes to the decoder), and mNumUndequeuedBuffers=1 afterwards so flush/teardown does not wait
+   for the frame SurfaceFlinger is showing.
+4. nBufferCountActual = max(component's own value, nBufferCountMin + 1 + debug.fsl.extrabufs(4)). NEVER below the
+   component's own value: after the sequence init it raises Actual itself (e.g. 11 for a stream with many reference
+   frames) and if fewer buffers are registered the VPU library reads garbage "frames" (ASCII text as physical addresses)
+   and the VPU DMAs into random RAM -> every process segfaults (this crashed the whole system with Disco.240p once).
+   extrabufs=2 stalls the decoder, 7 starves the GPU pool; 4 (= min+5, what the component allocates itself) is right.
+5. BufferQueueProducer::waitForFreeSlotThenRelock: no "exceed max dequeued buffer count" error for the FSL YUV formats
+   (0x100-0x103): the decoder holds every buffer, dequeue then blocks until SurfaceFlinger releases one.
+6. ACodec: after the very first rendered frame the refill dequeue is skipped (`mFslFirstRenderDone`): nothing is free
+   yet and SurfaceFlinger only releases frame 1 once frame 2 is on screen -> blocking would deadlock the looper.
+Not working / limits: WebView `<video>` (Jelly) shows no picture with hwrender 0 or 1 (pre-existing; its decoder also
+sees dequeueBuffer WOULD_BLOCK on the SurfaceTexture, which the FSL path does not retry); VP8 (OMX.Freescale vpx
+configureCodec fails, OMX.google.vpx.decoder cannot be instantiated either); the GPU (galcore) memory pool of 176 MB
+fills up after ~10 plays (force-stop style tests): galcore then SIGKILLs apps ("<gpu> send sigkill" in dmesg), restarting
+SurfaceFlinger (`setprop ctl.restart surfaceflinger`) gives the memory back, killing media.codec/mediaserver does not.
+Test clips: gst-launch videotestsrc (ball) + x264enc (profile=high), see /tmp in the session; `dumpsys media.player` shows
+numFramesTotal/numFramesDropped; panel pages can be dumped with `cat /dev/graphics/fb0` (3 pages of 1024x768 RGBA).
