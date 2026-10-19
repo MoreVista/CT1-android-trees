@@ -296,3 +296,7 @@ GLES composition (slow, 26-36 ms/frame vs ~5-9 ms, but tear-free). Do NOT toggle
 Tools used (sources only in the session; `tools/sftest` is the EGL solid-colour client): fbcap (page capture),
 crashpc (ptrace SIGSEGV dumper), strace of surfaceflinger. Avoid `input tap/swipe` on the device (spawns a JVM and
 drives it into LMK); use sendevent scripts.
+
+### Final validation (2026-10-19)
+Zip lineage-14.1-20261019-UNOFFICIAL-40S404 (sha256 ce01a541...a80b) flashed via TWRP. User-verified on the tablet: no flicker
+(HWC composition with pan-vsync wait), scrolling OK, audio, SD card / MTP and sensors work. Open: camera, zero-copy/720p+ video.
