@@ -1,0 +1,61 @@
+diff --git a/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java b/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+index 7415a1fc30..1d25c8cfd0 100644
+--- a/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
++++ b/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+@@ -4079,7 +4079,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+             }
+ 
+             case KeyEvent.KEYCODE_POWER: {
+-                if ((mTopFullscreenOpaqueWindowState.getAttrs().flags
++                if (mTopFullscreenOpaqueWindowState != null
++                        && (mTopFullscreenOpaqueWindowState.getAttrs().flags
+                         & WindowManager.LayoutParams.PREVENT_POWER_KEY) != 0){
+                     return result;
+                 }
+diff --git a/services/input/EventHub.cpp b/services/input/EventHub.cpp
+index 1c9520d28d..6f97ae6c0d 100644
+--- a/services/input/EventHub.cpp
++++ b/services/input/EventHub.cpp
+@@ -301,6 +301,23 @@ status_t EventHub::getAbsoluteAxisInfo(int32_t deviceId, int axis,
+                 outAxisInfo->flat = info.flat;
+                 outAxisInfo->fuzz = info.fuzz;
+                 outAxisInfo->resolution = info.resolution;
++
++                // Optional per-device override of the reported range from the
++                // .idc file (abs.<axis code>.min / abs.<axis code>.max). Needed
++                // for digitizers whose driver declares a wider range than the
++                // one they actually produce (e.g. rohm_bu21025 on 40S404).
++                if (device->configuration) {
++                    int32_t v;
++                    char key[32];
++                    snprintf(key, sizeof(key), "abs.%d.min", axis);
++                    if (device->configuration->tryGetProperty(String8(key), v)) {
++                        outAxisInfo->minValue = v;
++                    }
++                    snprintf(key, sizeof(key), "abs.%d.max", axis);
++                    if (device->configuration->tryGetProperty(String8(key), v)) {
++                        outAxisInfo->maxValue = v;
++                    }
++                }
+             }
+             return OK;
+         }
+diff --git a/services/java/com/android/server/usb/UsbDeviceManager.java b/services/java/com/android/server/usb/UsbDeviceManager.java
+index 5d962b960f..03e17261f4 100644
+--- a/services/java/com/android/server/usb/UsbDeviceManager.java
++++ b/services/java/com/android/server/usb/UsbDeviceManager.java
+@@ -124,8 +124,13 @@ public class UsbDeviceManager {
+         }
+         @Override
+         public void onChange(boolean selfChange) {
++            // On a fresh /data the ADB_ENABLED row does not exist yet and the
++            // ADB_PORT insert fires this observer first; defaulting to 0 here
++            // turned adb off and persisted persist.sys.usb.config=none.
++            int def = SystemProperties.get("persist.sys.usb.config", "adb")
++                    .contains("adb") ? 1 : 0;
+             boolean enable = (Settings.Global.getInt(mContentResolver,
+-                    Settings.Global.ADB_ENABLED, 0) > 0);
++                    Settings.Global.ADB_ENABLED, def) > 0);
+             mHandler.sendMessage(MSG_ENABLE_ADB, enable);
+         }
+     }

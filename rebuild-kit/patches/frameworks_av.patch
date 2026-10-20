@@ -1,0 +1,304 @@
+diff --git a/include/media/stagefright/ACodec.h b/include/media/stagefright/ACodec.h
+index 08601aa1e..927ac502d 100644
+--- a/include/media/stagefright/ACodec.h
++++ b/include/media/stagefright/ACodec.h
+@@ -177,6 +177,7 @@ private:
+ 
+     bool mSentFormat;
+     bool mIsEncoder;
++    bool mFslFirstRenderDone;
+ 
+     bool mShutdownInProgress;
+ 
+diff --git a/include/media/stagefright/OMXCodec.h b/include/media/stagefright/OMXCodec.h
+index 630f5afeb..d916a9b74 100644
+--- a/include/media/stagefright/OMXCodec.h
++++ b/include/media/stagefright/OMXCodec.h
+@@ -234,6 +234,7 @@ private:
+     Condition mAsyncCompletion;
+ 
+     bool mPaused;
++    bool mFslFirstRenderDone;
+ 
+     sp<ANativeWindow> mNativeWindow;
+ 
+diff --git a/media/libstagefright/ACodec.cpp b/media/libstagefright/ACodec.cpp
+index a9e344d03..8e0e2dca9 100644
+--- a/media/libstagefright/ACodec.cpp
++++ b/media/libstagefright/ACodec.cpp
+@@ -17,6 +17,7 @@
+ //#define LOG_NDEBUG 0
+ #define LOG_TAG "ACodec"
+ 
++#include <cutils/properties.h>
+ #include <media/stagefright/ACodec.h>
+ 
+ #include <binder/MemoryDealer.h>
+@@ -55,6 +56,14 @@
+ 
+ #include "include/avc_utils.h"
+ 
++// Freescale: persist.sys.fsl.hwrender=1 lets the VPU decoder render straight into
++// native-window buffers (zero copy); otherwise it is treated like a software codec.
++static bool fslHwRender() {
++    char value[PROPERTY_VALUE_MAX];
++    property_get("persist.sys.fsl.hwrender", value, "0");
++    return value[0] == '1';
++}
++
+ namespace android {
+ 
+ template<class T>
+@@ -379,6 +388,7 @@ ACodec::ACodec()
+       mNode(NULL),
+       mSentFormat(false),
+       mIsEncoder(false),
++      mFslFirstRenderDone(false),
+       mShutdownInProgress(false),
+       mEncoderDelay(0),
+       mEncoderPadding(0),
+@@ -540,7 +550,21 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
+     return OK;
+ }
+ 
++
++// Freescale i.MX gralloc does not understand raw OMX color-format values; stock maps
++// them to its own HAL formats before sizing the native window buffers.
++static int fslNativeFormatFromOmx(OMX_COLOR_FORMATTYPE f) {
++    switch ((int)f) {
++        case OMX_COLOR_Format16bitRGB565:           return HAL_PIXEL_FORMAT_RGB_565;
++        case OMX_COLOR_FormatYUV420Planar:          return 0x101;
++        case OMX_COLOR_FormatYUV420SemiPlanar:      return 0x103;
++        case OMX_COLOR_FormatYUV420PackedSemiPlanar:return 0x100;
++        default:                                    return (int)f;
++    }
++}
++
+ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
++    mFslFirstRenderDone = false;
+     OMX_PARAM_PORTDEFINITIONTYPE def;
+     InitOMXParams(&def);
+     def.nPortIndex = kPortIndexOutput;
+@@ -566,7 +590,7 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
+             mNativeWindow.get(),
+             def.format.video.nFrameWidth,
+             def.format.video.nFrameHeight,
+-            def.format.video.eColorFormat);
++            fslNativeFormatFromOmx(def.format.video.eColorFormat));
+ #endif
+ 
+     if (err != 0) {
+@@ -630,8 +654,14 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
+     // XXX: Is this the right logic to use?  It's not clear to me what the OMX
+     // buffer counts refer to - how do they account for the renderer holding on
+     // to buffers?
+-    if (def.nBufferCountActual < def.nBufferCountMin + minUndequeuedBufs) {
+-        OMX_U32 newBufferCount = def.nBufferCountMin + minUndequeuedBufs;
++    // Freescale stock behaviour: the VPU decoder needs every frame buffer it
++    // reports, so none are held back for the native window (stock overwrites
++    // minUndequeuedBufs with 0 here). Requires BufferQueue not to enforce its
++    // min-undequeued check (see patches/frameworks_native-BufferQueue-*.patch).
++    minUndequeuedBufs = 0;
++
++    if (def.nBufferCountActual < def.nBufferCountMin) {
++        OMX_U32 newBufferCount = def.nBufferCountMin;
+         def.nBufferCountActual = newBufferCount;
+         err = mOMX->setParameter(
+                 mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
+@@ -3139,10 +3169,18 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
+         {
+             if (!mCodec->mPortEOS[kPortIndexOutput]) {
+                 if (info->mStatus == BufferInfo::OWNED_BY_NATIVE_WINDOW) {
++                    if (!mCodec->mFslFirstRenderDone
++                            && !strncmp("OMX.Freescale.", mCodec->mComponentName.c_str(), 14)) {
++                        // Freescale VPU: all buffers belong to the decoder, there is no
++                        // spare yet; dequeueing now would deadlock (see NOTES.md).
++                        mCodec->mFslFirstRenderDone = true;
++                        info = NULL;
++                    } else {
+                     // We cannot resubmit the buffer we just rendered, dequeue
+                     // the spare instead.
+ 
+                     info = mCodec->dequeueBufferFromNativeWindow();
++                    }
+                 }
+ 
+                 if (info != NULL) {
+@@ -3554,7 +3592,9 @@ bool ACodec::LoadedState::onConfigureComponent(
+ 
+     sp<RefBase> obj;
+     if (msg->findObject("native-window", &obj)
+-            && strncmp("OMX.google.", mCodec->mComponentName.c_str(), 11)) {
++            && strncmp("OMX.google.", mCodec->mComponentName.c_str(), 11)
++            && (strncmp("OMX.Freescale.", mCodec->mComponentName.c_str(), 14)
++                || fslHwRender())) {
+         sp<NativeWindowWrapper> nativeWindow(
+                 static_cast<NativeWindowWrapper *>(obj.get()));
+         CHECK(nativeWindow != NULL);
+diff --git a/media/libstagefright/AwesomePlayer.cpp b/media/libstagefright/AwesomePlayer.cpp
+index 1b1ba37da..821c83f88 100644
+--- a/media/libstagefright/AwesomePlayer.cpp
++++ b/media/libstagefright/AwesomePlayer.cpp
+@@ -73,6 +73,14 @@
+ #define LPA_MIN_DURATION_USEC_ALLOWED 30000000
+ #define LPA_MIN_DURATION_USEC_DEFAULT 60000000
+ 
++// Freescale: persist.sys.fsl.hwrender=1 lets the VPU decoder render straight into
++// native-window buffers (zero copy); otherwise it is treated like a software codec.
++static bool fslHwRender() {
++    char value[PROPERTY_VALUE_MAX];
++    property_get("persist.sys.fsl.hwrender", value, "0");
++    return value[0] == '1';
++}
++
+ namespace android {
+ 
+ static int64_t kLowWaterMarkUs = 2000000ll;  // 2secs
+@@ -1289,6 +1297,7 @@ void AwesomePlayer::initRenderer_l() {
+     if (USE_SURFACE_ALLOC
+             && !strncmp(component, "OMX.", 4)
+             && strncmp(component, "OMX.google.", 11)
++            && (strncmp(component, "OMX.Freescale.", 14) || fslHwRender())
+             && strcmp(component, "OMX.Nvidia.mpeg2v.decode")) {
+         // Hardware decoders avoid the CPU color conversion by decoding
+         // directly to ANativeBuffers, so we must use a renderer that
+diff --git a/media/libstagefright/MediaCodec.cpp b/media/libstagefright/MediaCodec.cpp
+index 56e6df021..20f300d96 100644
+--- a/media/libstagefright/MediaCodec.cpp
++++ b/media/libstagefright/MediaCodec.cpp
+@@ -18,6 +18,7 @@
+ #define LOG_TAG "MediaCodec"
+ #include <utils/Log.h>
+ 
++#include <cutils/properties.h>
+ #include <media/stagefright/MediaCodec.h>
+ 
+ #include "include/SoftwareRenderer.h"
+@@ -34,6 +35,14 @@
+ #include <media/stagefright/MetaData.h>
+ #include <media/stagefright/NativeWindowWrapper.h>
+ 
++// Freescale: persist.sys.fsl.hwrender=1 lets the VPU decoder render straight into
++// native-window buffers (zero copy); otherwise it is treated like a software codec.
++static bool fslHwRender() {
++    char value[PROPERTY_VALUE_MAX];
++    property_get("persist.sys.fsl.hwrender", value, "0");
++    return value[0] == '1';
++}
++
+ namespace android {
+ 
+ // static
+@@ -537,7 +546,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
+                     AString componentName;
+                     CHECK(msg->findString("componentName", &componentName));
+ 
+-                    if (componentName.startsWith("OMX.google.")) {
++                    if (componentName.startsWith("OMX.google.")
++                            || (componentName.startsWith("OMX.Freescale.") && !fslHwRender())) {
+                         mFlags |= kFlagIsSoftwareCodec;
+                     } else {
+                         mFlags &= ~kFlagIsSoftwareCodec;
+diff --git a/media/libstagefright/OMXCodec.cpp b/media/libstagefright/OMXCodec.cpp
+index 91ba0930b..cad5abcef 100644
+--- a/media/libstagefright/OMXCodec.cpp
++++ b/media/libstagefright/OMXCodec.cpp
+@@ -31,6 +31,7 @@
+ #include <binder/MemoryDealer.h>
+ #include <binder/ProcessState.h>
+ #include <HardwareAPI.h>
++#include <cutils/properties.h>
+ #include <media/stagefright/foundation/ADebug.h>
+ #include <media/IMediaPlayerService.h>
+ #include <media/stagefright/MediaBuffer.h>
+@@ -202,6 +203,15 @@ static void InitOMXParams(T *params) {
+     params->nVersion.s.nStep = 0;
+ }
+ 
++
++// Freescale: persist.sys.fsl.hwrender=1 lets the VPU decoder render straight into
++// native-window buffers (zero copy); otherwise it is treated like a software codec.
++static bool fslHwRender() {
++    char value[PROPERTY_VALUE_MAX];
++    property_get("persist.sys.fsl.hwrender", value, "0");
++    return value[0] == '1';
++}
++
+ static bool IsSoftwareCodec(const char *componentName) {
+     if (!strncmp("OMX.google.", componentName, 11)
+         || !strncmp("OMX.PV.", componentName, 7)) {
+@@ -1690,8 +1700,10 @@ OMXCodec::OMXCodec(
+       mSkipCutBuffer(NULL),
+       mLeftOverBuffer(NULL),
+       mPaused(false),
++      mFslFirstRenderDone(false),
+       mNativeWindow(
+               (!strncmp(componentName, "OMX.google.", 11)
++              || (!strncmp(componentName, "OMX.Freescale.", 14) && !fslHwRender())
+               || !strcmp(componentName, "OMX.Nvidia.mpeg2v.decode"))
+                         ? NULL : nativeWindow)
+ #ifdef QCOM_HARDWARE
+@@ -2070,7 +2082,21 @@ status_t OMXCodec::applyRotation() {
+     return err;
+ }
+ 
++
++// Freescale i.MX gralloc does not understand raw OMX color-format values; stock maps
++// them to its own HAL formats before sizing the native window buffers.
++static int fslNativeFormatFromOmx(OMX_COLOR_FORMATTYPE f) {
++    switch ((int)f) {
++        case OMX_COLOR_Format16bitRGB565:           return HAL_PIXEL_FORMAT_RGB_565;
++        case OMX_COLOR_FormatYUV420Planar:          return 0x101;
++        case OMX_COLOR_FormatYUV420SemiPlanar:      return 0x103;
++        case OMX_COLOR_FormatYUV420PackedSemiPlanar:return 0x100;
++        default:                                    return (int)f;
++    }
++}
++
+ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
++    mFslFirstRenderDone = false;
+     // Get the number of buffers needed.
+     OMX_PARAM_PORTDEFINITIONTYPE def;
+     InitOMXParams(&def);
+@@ -2088,7 +2114,7 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
+             mNativeWindow.get(),
+             def.format.video.nFrameWidth,
+             def.format.video.nFrameHeight,
+-            def.format.video.eColorFormat);
++            fslNativeFormatFromOmx(def.format.video.eColorFormat));
+ #else
+     OMX_COLOR_FORMATTYPE eColorFormat;
+ 
+@@ -2176,8 +2202,14 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
+     // XXX: Is this the right logic to use?  It's not clear to me what the OMX
+     // buffer counts refer to - how do they account for the renderer holding on
+     // to buffers?
+-    if (def.nBufferCountActual < def.nBufferCountMin + minUndequeuedBufs) {
+-        OMX_U32 newBufferCount = def.nBufferCountMin + minUndequeuedBufs;
++    // Freescale stock behaviour: the VPU decoder needs every frame buffer it
++    // reports, so none are held back for the native window (stock overwrites
++    // minUndequeuedBufs with 0 here). Requires BufferQueue not to enforce its
++    // min-undequeued check (see patches/frameworks_native-BufferQueue-*.patch).
++    minUndequeuedBufs = 0;
++
++    if (def.nBufferCountActual < def.nBufferCountMin) {
++        OMX_U32 newBufferCount = def.nBufferCountMin;
+         def.nBufferCountActual = newBufferCount;
+         err = mOMX->setParameter(
+                 mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
+@@ -4699,6 +4731,15 @@ void OMXCodec::signalBufferReturned(MediaBuffer *buffer) {
+ 
+                 info->mStatus = OWNED_BY_NATIVE_WINDOW;
+ 
++                // Freescale VPU: all buffers were handed to the decoder, so there is no
++                // spare to dequeue after the very first render (dequeueing would block
++                // until the next frame, which the VPU cannot produce without a buffer).
++                if (rendered && !mFslFirstRenderDone
++                        && !strncmp(mComponentName, "OMX.Freescale.", 14)) {
++                    mFslFirstRenderDone = true;
++                    return;
++                }
++
+                 // Dequeue the next buffer from the native window.
+                 BufferInfo *nextBufInfo = dequeueBufferFromNativeWindow();
+                 if (nextBufInfo == 0) {

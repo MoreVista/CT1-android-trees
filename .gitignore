@@ -1,0 +1,4 @@
+# stock blobs / kernel / WebView are not part of this repository
+vendor/*/*/proprietary/
+device/*/*/prebuilt/zImage
+device/*/*/webview/*.apk

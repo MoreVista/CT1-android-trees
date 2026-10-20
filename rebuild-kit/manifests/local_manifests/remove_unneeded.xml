@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <!-- Eclipse/ADT IDE tooling, not needed for a command-line mka build.
+       This project repeatedly caused runaway multi-tens-of-GB temp pack
+       fetches during initial sync attempts on 2026-10-01, so it is
+       excluded rather than re-risking the same issue. -->
+  <remove-project name="platform/prebuilts/tools" />
+
+  <!-- SDK/AVD emulator (qemu). Not needed to build a real-device ROM;
+       its "emulator-arm" target unconditionally links against a
+       libSDL module whose Android.mk is never actually generated in
+       this tree, so leaving it in makes mka bacon fail every time. -->
+  <remove-project name="platform/external/qemu" />
+</manifest>

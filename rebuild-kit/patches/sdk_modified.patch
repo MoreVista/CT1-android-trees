@@ -1,0 +1,22 @@
+diff --git a/ddms/Android.mk b/ddms/Android.mk
+index 82c248e43..f25a0a35b 100644
+--- a/ddms/Android.mk
++++ b/ddms/Android.mk
+@@ -2,4 +2,6 @@
+ #
+ DDMS_LOCAL_DIR := $(call my-dir)
+ include $(DDMS_LOCAL_DIR)/libs/Android.mk
+-include $(DDMS_LOCAL_DIR)/app/Android.mk
++# app/ (the desktop DDMS GUI launcher, needs ddmuilib/SWT) removed -- not
++# needed for a real-device ROM, and ddmuilib pulled in Eclipse/SWT/
++# jfreechart jars this tree doesn't have. See 40s404-cm10.1 build notes.
+diff --git a/ddms/libs/Android.mk b/ddms/libs/Android.mk
+index c62c6d05e..d764e1c83 100644
+--- a/ddms/libs/Android.mk
++++ b/ddms/libs/Android.mk
+@@ -2,4 +2,4 @@
+ #
+ DDMSLIBS_LOCAL_DIR := $(call my-dir)
+ include $(DDMSLIBS_LOCAL_DIR)/ddmlib/Android.mk
+-include $(DDMSLIBS_LOCAL_DIR)/ddmuilib/Android.mk
++# ddmuilib/ (SWT-based GUI toolkit) removed -- see sdk/ddms/Android.mk.
