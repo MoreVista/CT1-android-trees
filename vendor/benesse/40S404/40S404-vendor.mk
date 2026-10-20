@@ -1,25 +1,21 @@
 LOCAL_PATH := vendor/benesse/40S404
 
+# The generic audio HALs (policy/a2dp/usb/r_submix) are NOT taken from the 4.2 stock system:
+# KitKat's AudioFlinger is not ABI compatible with them. They are built from source.
+
 $(call inherit-product, vendor/benesse/40S404/40S404-omx.mk)
 
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/proprietary/lib/libGAL.so:system/lib/libGAL.so \
-    $(LOCAL_PATH)/proprietary/lib/libGLES_trace.so:system/lib/libGLES_trace.so \
-    $(LOCAL_PATH)/proprietary/lib/libjni_eglfence.so:system/lib/libjni_eglfence.so \
     $(LOCAL_PATH)/proprietary/lib/libGLSLC.so:system/lib/libGLSLC.so \
     $(LOCAL_PATH)/proprietary/lib/libg2d.so:system/lib/libg2d.so \
     $(LOCAL_PATH)/proprietary/lib/libion.so:system/lib/libion.so \
     $(LOCAL_PATH)/proprietary/lib/libtinyfsl.so:system/lib/libtinyfsl.so \
     $(LOCAL_PATH)/proprietary/egl/libEGL_VIVANTE.so:system/lib/egl/libEGL_VIVANTE.so \
-    $(LOCAL_PATH)/proprietary/egl/libGLES_android.so:system/lib/egl/libGLES_android.so \
     $(LOCAL_PATH)/proprietary/egl/libGLESv1_CM_VIVANTE.so:system/lib/egl/libGLESv1_CM_VIVANTE.so \
     $(LOCAL_PATH)/proprietary/egl/libGLESv2_VIVANTE.so:system/lib/egl/libGLESv2_VIVANTE.so \
     $(LOCAL_PATH)/proprietary/egl/egl.cfg:system/lib/egl/egl.cfg \
     $(LOCAL_PATH)/proprietary/hw/audio.primary.imx6.so:system/lib/hw/audio.primary.imx6.so \
-    $(LOCAL_PATH)/proprietary/hw/audio.a2dp.default.so:system/lib/hw/audio.a2dp.default.so \
-    $(LOCAL_PATH)/proprietary/hw/audio.r_submix.default.so:system/lib/hw/audio.r_submix.default.so \
-    $(LOCAL_PATH)/proprietary/hw/audio.usb.default.so:system/lib/hw/audio.usb.default.so \
-    $(LOCAL_PATH)/proprietary/hw/audio_policy.default.so:system/lib/hw/audio_policy.default.so \
     $(LOCAL_PATH)/proprietary/hw/camera.imx6.so:system/lib/hw/camera.imx6.so \
     $(LOCAL_PATH)/proprietary/hw/gralloc.imx6.so:system/lib/hw/gralloc.imx6.so \
     $(LOCAL_PATH)/proprietary/hw/gralloc_viv.imx6.so:system/lib/hw/gralloc_viv.imx6.so \
@@ -32,7 +28,6 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/proprietary/etc/media_profiles.xml:system/etc/media_profiles.xml \
     $(LOCAL_PATH)/proprietary/etc/wifi/mlan.ko:system/etc/wifi/mlan.ko \
     $(LOCAL_PATH)/proprietary/etc/wifi/sd8787.ko:system/etc/wifi/sd8787.ko \
-    $(LOCAL_PATH)/proprietary/etc/wifi/wpa_supplicant.conf:system/etc/wifi/wpa_supplicant.conf \
     $(LOCAL_PATH)/proprietary/etc/firmware/mrvl/sd8787_uapsta.bin:system/etc/firmware/mrvl/sd8787_uapsta.bin \
     $(LOCAL_PATH)/proprietary/bin/mlaninit.sh:system/bin/mlaninit.sh \
     $(LOCAL_PATH)/proprietary/bin/mlanutl:system/bin/mlanutl \
