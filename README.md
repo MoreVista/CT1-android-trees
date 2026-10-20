@@ -1,8 +1,8 @@
-# Android 4.4 (CyanogenMod 11) on the Benesse 40S404
+# Android 4.4 (CyanogenMod 11) on the Benesse 40S404 and 41EA04
 
 Branch `android-4.4-cm11` (ROM base: CyanogenMod 11 (cm-11.0)). See the repository's `main` branch for the overview and for what is not included.
 
-Status: boots, display/touch/Wi-Fi/audio/VPU video work. Details: `device/benesse/40S404/NOTES.md`. The sibling tablet 41EA04 is on branch `android-4.4-cm11-41EA04`.
+Status: boots, display/touch/Wi-Fi/audio/VPU video work. Details: `device/benesse/40S404/NOTES.md`. This branch also carries the sibling tablet 41EA04: `device/benesse/41EA04`, `vendor/benesse/41EA04` (`lunch cm_41EA04-userdebug`).
 
 ## Build
 
