@@ -108,3 +108,32 @@ Status (2026-10-03): boots, lockscreen/UI render on GPU (GLES2/HWUI), adb, WiFi 
 - Media codecs (VPU: libvpu, lib_vpu_wrapper, stagefright hw) and audio_policy.conf / media_codecs.xml not ported.
 - Stock init.rc exports (VPU_FW_PATH, shm mounts) not ported.
 - Two HOME apps (Launcher2 + Trebuchet) => "Complete action using" chooser.
+
+---
+# CM11 (4.4.4) port notes
+
+Build: docker `cm11-build:14.04`, `lunch cm_40S404-userdebug` (not eng: eng forces CheckJNI = very slow).
+Flash via TWRP; install is only done when `/tmp/updater` has exited (verify md5 of a lib in /system).
+
+## Findings
+1. Stock 4.2 /data carried over: Trebuchet DB incompatible -> `pm clear com.cyanogenmod.trebuchet`.
+2. Touch offset: EventHub idc `abs.<code>.min/max` override patch (panel range X 40-936, Y 70-732).
+3. Slow: conservative@396MHz -> set `interactive` governor in init.freescale.rc.
+4. WiFi: KitKat needs separate `wpa_supplicant` / `p2p_supplicant` services (`-O/data/misc/wifi/sockets -g@android:wpa_wlan0`), no stock wpa_supplicant.conf.
+5. `ro.zygote.disable_gl_preload=true`: preloading GL in zygote SIGSEGVs in stock libGAL.
+6. auditd respawns forever (kernel lacks audit netlink) -> `stop auditd` in `on boot`.
+7. BufferQueue: the min-undequeued check must be skipped ONLY for the FSL YUV formats (0x100-0x103).
+   Removing it globally lets GL clients (bootanimation, ...) dequeue every free buffer and deadlock
+   (random freeze at the first bootanimation frame, bootanim never exits).
+8. Video (persist.sys.fsl.hwrender=1): port of the CM10.1 patch to OMXCodec/ACodec/AwesomePlayer/MediaCodec
+   (HAL format mapping, minUndequeued=0, skip first dequeue after first render).
+9. Stock libstagefrighthw.so (FSLOMXWrapper::DoUseNativeBuffer) recovers the GraphicBuffer from the
+   ANativeWindowBuffer pointer with "- 4" (JB 4.2 layout). KitKat has ANativeWindowBuffer at offset 0,
+   so OMXNodeInstance::useGraphicBuffer passes GraphicBuffer+4 (otherwise SIGSEGV in GraphicBufferMapper::lock).
+10. adb: `ro.adb.secure=0` in device mk; `adb root` needs Settings > Developer > Root access = Apps and ADB.
+11. Bootanimation is LineageOS's (vendor/cm cm-11.0 branch), not a bug.
+
+## Patches (apply to the CM11 tree)
+see patches/*.patch (frameworks_av, frameworks_native, frameworks_base EventHub, dalvik zygote fd whitelist,
+system_core VectorImpl shims). Also hand-edited: libutils Unicode.cpp, art/libnativehelper build fixes,
+build/tools/releasetools/edify_generator.py (set_perm instead of set_metadata).

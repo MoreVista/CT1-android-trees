@@ -88,3 +88,7 @@ BOARD_HOSTAPD_PRIVATE_LIB := lib_driver_cmd_bcmdhd
 WIFI_DRIVER_FW_PATH_PARAM := "/dev/null"
 
 TARGET_USES_LOGD := true
+
+# NOTE: the reserved VectorImpl symbols that the stock blobs reference are exported by
+# VectorImplShims.cpp (patches/system_core-libutils-vectorimpl-shims.patch). Do NOT use
+# -DNEEDS_VECTORIMPL_SYMBOLS: it shifts SortedVectorImpl::do_compare's vtable slot.
