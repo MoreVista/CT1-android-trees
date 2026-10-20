@@ -1,0 +1,16 @@
+diff --git a/libs/hwui/OpenGLRenderer.cpp b/libs/hwui/OpenGLRenderer.cpp
+index c0f6daeb..6b4f8cd9 100755
+--- a/libs/hwui/OpenGLRenderer.cpp
++++ b/libs/hwui/OpenGLRenderer.cpp
+@@ -2513,7 +2513,10 @@ status_t OpenGLRenderer::drawRoundRect(float left, float top, float right, float
+         return DrawGlInfo::kStatusDone;
+     }
+ 
+-    if (p->getPathEffect() != 0) {
++    // 40S404: the Vivante GLES driver does not render the vertex-alpha (AA tessellated)
++    // round rect fill (e.g. the Material dialog background comes out fully transparent),
++    // so always use the path-texture route, which is otherwise only taken for path effects.
++    if (true || p->getPathEffect() != 0) {
+         mCaches.activeTexture(0);
+         const PathTexture* texture = mCaches.pathCache.getRoundRect(
+                 right - left, bottom - top, rx, ry, p);

@@ -92,3 +92,7 @@ TARGET_USES_LOGD := true
 # NOTE: the reserved VectorImpl symbols that the stock blobs reference are exported by
 # VectorImplShims.cpp (patches/system_core-libutils-vectorimpl-shims.patch). Do NOT use
 # -DNEEDS_VECTORIMPL_SYMBOLS: it shifts SortedVectorImpl::do_compare's vtable slot.
+
+# The VPU shared memory is at physical address 0xddf84000 (> 2 GB). Lollipop's bionic mmap()
+# rejects the (negative) 32-bit off_t that the stock libvpu passes; LEGACY_MMAP masks it as unsigned.
+BOARD_USES_LEGACY_MMAP := true
