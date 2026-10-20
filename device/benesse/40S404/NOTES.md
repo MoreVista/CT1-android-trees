@@ -332,3 +332,21 @@ SurfaceFlinger (`setprop ctl.restart surfaceflinger`) gives the memory back, kil
 Test clips: gst-launch videotestsrc (ball) + x264enc (profile=high), see /tmp in the session; `dumpsys media.player` shows
 numFramesTotal/numFramesDropped; panel pages can be dumped with `cat /dev/graphics/fb0` (3 pages of 1024x768 RGBA).
 Flashed 2026-10-20: lineage-14.1-20261019-UNOFFICIAL-40S404.zip (with zero-copy video); 720p/1080p/240p/480p verified, 0 drops.
+
+### WebView `<video>` shows no picture (investigated 2026-10-20, NOT solved)
+Jelly + com.google.android.webview 95 on N: the `<video>` rectangle stays transparent although decoding runs
+(readyState 4, currentTime advances, getVideoPlaybackQuality().totalVideoFrames grows) -- with OMX.Freescale (hwrender 0 and 1)
+and with OMX.google.h264 alike, at 240p..1080p. Findings:
+- `canvas.drawImage(video)` DOES show the frame -> MediaCodec -> SurfaceTexture -> GL copy works inside Chromium; only the
+  compositor's video quad is never drawn (render-pass dump contains only PictureContent + SolidColor quads).
+- The platform side is fine: `tools/textest` (TextureView + MediaPlayer, getBitmap() pixel statistics) displays 720p video
+  correctly, including the zero-copy FSL gralloc formats through GLConsumer/GL_TEXTURE_EXTERNAL_OES.
+- While the page plays video Chromium logs "tile_manager.cc: tile memory limits exceeded" every frame (4x on a plain page);
+  --disable-low-end-device-mode, --force-gpu-mem-available-mb, --disable(enable)-gpu-rasterization,
+  --disable-features=UseSurfaceLayerForVideo / MediaCodecAsyncApi / AImageReaderVideoOutput made no difference.
+  Chromium's media VLOGs are compiled out of the release WebView, so the exact reason is unknown (suspect: Skia's external-OES
+  sampling shader on the Vivante GLES2 driver, or the SurfaceTexture quad path).
+- Debug aids: userdebug honours /data/local/tmp/webview-command-line (first token is a dummy, e.g. `_ --enable-logging=stderr
+  --v=3`), `adb reverse tcp:8000 tcp:8000` + `python3 -m http.server` to serve test pages. Every WebView launch costs galcore
+  memory: after ~10 launches `<gpu> send sigkill` kills the browser; `setprop ctl.restart surfaceflinger` resets the pool.
+- Ideas not tried: another WebView build (e.g. AOSP/Chromium ~M55-M70 GL renderer), Vivante shader-compile logging.
