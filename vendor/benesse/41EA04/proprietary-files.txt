@@ -1,0 +1,69 @@
+# Benesse 41EA04 (i.MX6Q "bee01") proprietary blobs.
+# Extracted directly from the stock /system on the real unit (SN <41EA04-serial>),
+# 2026-10-01, via adb pull with root. See ../twrp-build-40s404.md (sibling
+# TWRP project) for how these were identified.
+
+# GPU (Vivante GC350)
+lib/libGAL.so
+lib/libGLES_trace.so
+lib/libjni_eglfence.so
+# Vivante GLSL shader compiler: dlopen'd by libGLESv2_VIVANTE. Without it every
+# glCompileShader fails silently, so HWUI (GLES2) renders nothing -> blank UI.
+lib/libGLSLC.so
+# 2D GPU (used by hwcomposer_viv) and ION wrapper
+lib/libg2d.so
+lib/libion.so
+egl/libEGL_VIVANTE.so
+egl/libGLES_android.so
+egl/libGLESv1_CM_VIVANTE.so
+egl/libGLESv2_VIVANTE.so
+egl/egl.cfg
+
+# Audio HAL
+hw/audio.primary.imx6.so
+hw/audio.a2dp.default.so
+hw/audio.r_submix.default.so
+hw/audio.usb.default.so
+hw/audio_policy.default.so
+
+# Camera, display, sensors, power, lights HALs
+hw/camera.imx6.so
+hw/gralloc.imx6.so
+hw/gralloc_viv.imx6.so
+hw/hwcomposer.imx6.so
+hw/hwcomposer_viv.imx6.so
+hw/lights.imx6.so
+hw/power.imx6.so
+hw/sensors.SABRESD.so
+
+# WiFi (Marvell sd8787, SDIO) -- out-of-tree kernel modules, no source in the
+# GPL kernel dump. Must be loaded against the EXACT kernel ABI they were
+# built for -- this device tree reuses the stock kernel verbatim (same
+# strategy as the TWRP port) specifically so these keep working unmodified.
+etc/wifi/mlan.ko
+etc/wifi/sd8787.ko
+etc/wifi/wpa_supplicant.conf
+etc/firmware/mrvl/sd8787_uapsta.bin
+
+# WiFi bring-up helpers invoked by init.freescale.rc services (mlan_init,
+# wifi_reset, cp_calib, mlan2040coex). Pulled from the stock backup tar.
+bin/mlaninit.sh
+bin/mlanutl
+bin/mlan2040coex
+bin/set_macaddr
+bin/wifi_reset.sh
+bin/copy_calib.sh
+
+# Audio routing / media profiles (stock). media_codecs.xml is NOT taken: it lists
+# Freescale OMX/VPU components (lib_omx_*, libvpu) that are not ported yet.
+etc/audio_policy.conf
+etc/media_profiles.xml
+
+# Freescale-extended tinyalsa (control_open & co. needed by audio.primary.imx6).
+# Shipped as libtinyfsl.so (stock libtinyalsa.so) so CM's own libtinyalsa is untouched;
+# hw/audio.primary.imx6.so has its DT_NEEDED string patched libtinyalsa.so -> libtinyfsl.so
+# (same length, in-place) to use it.
+lib/libtinyfsl.so
+
+# tinymix (stock, uses CM libtinyalsa mixer API) for audio_init.sh
+bin/tinymix
