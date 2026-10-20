@@ -1,0 +1,189 @@
+# Device init for Benesse 41EA04 (i.MX6, androidboot.hardware=freescale).
+# Ported from the stock ramdisk's init.freescale.rc. The file name matters:
+# init.rc does `import /init.${ro.hardware}.rc` and the kernel cmdline sets
+# androidboot.hardware=freescale, so a file named after the product
+# (init.41EA04.rc) is never read. Without this file nothing mounts /system
+# or /data (mount_all below is the only place that happens) and
+# init.freescale.usb.rc never configures the USB gadget, so the device
+# boots "blind": no display, no adb, no UART output after init starts.
+
+import init.${ro.hardware}.usb.rc
+
+on init
+    start watchdogd
+
+    # Freescale OMX core / VPU hardware codecs (stock init.rc exports). These must be
+    # in init's environment so mediaserver and every app process inherit them.
+    mkdir /mnt/shm 0775 system graphics
+    mount tmpfs tmpfs /mnt/shm mode=0775,uid=1000,gid=1003,size=1m
+    export SHM_MOUNTPOINT /mnt/shm
+    export CODEC_SHM_PATH /mnt/shm
+    export VPU_FW_PATH /system/lib/firmware/vpu
+    export CORE_REGISTER_FILE /system/etc/core_register
+    export COMPONENT_REGISTER_FILE /system/etc/component_register
+    export CONTENTPIPE_REGISTER_FILE /system/etc/contentpipe_register
+
+    # Mount points used by the stock fstab / calibration scripts
+    mkdir /factory 0771 system system
+
+    # See storage config details at http://source.android.com/tech/storage/
+    mkdir /mnt/shell/emulated 0700 shell shell
+    mkdir /storage/emulated 0555 root root
+    mkdir /storage/extsd 0000 system system
+    mkdir /storage/udisk 0000 system system
+
+    export EXTERNAL_STORAGE /storage/emulated/legacy
+    export EXTERNAL_STORAGE_EXTSD /mnt/extsd
+    export EMULATED_STORAGE_SOURCE /mnt/shell/emulated
+    export EMULATED_STORAGE_TARGET /storage/emulated
+
+    # Support legacy paths
+    symlink /storage/emulated/legacy /sdcard
+    symlink /storage/emulated/legacy /mnt/sdcard
+    symlink /storage/emulated/legacy /storage/sdcard0
+    symlink /mnt/shell/emulated/0 /storage/emulated/legacy
+
+on post-fs-data
+    # wpa_ctrl binds its client socket in here; without it the framework fails
+    # with "Unable to open connection to supplicant on wlan0: No such file".
+    mkdir /data/misc/wifi 0770 wifi wifi
+    mkdir /data/misc/wifi/sockets 0770 wifi wifi
+    # dhcpcd keeps its lease/pid files here
+    mkdir /data/misc/dhcp 0770 dhcp dhcp
+    chown dhcp dhcp /data/misc/dhcp
+
+on fs
+    mount_all /fstab.freescale
+
+on boot
+    # The kernel has no audit netlink (no SELinux): auditd fails and respawns forever
+    stop auditd
+    # CPU governor: the kernel default (conservative) stays at 396 MHz; stock used interactive
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor interactive
+    write /sys/devices/system/cpu/cpufreq/interactive/timer_rate 40000
+    write /sys/devices/system/cpu/cpufreq/interactive/min_sample_time 60000
+    write /sys/devices/system/cpu/cpufreq/interactive/go_hispeed_load 40
+    write /sys/devices/system/cpu/cpufreq/interactive/input_boost 1
+
+    # Set permission for IIM node
+    symlink /dev/mxs_viim /dev/mxc_mem
+
+    setprop ro.tether.denied false
+
+    # 3D acceleration property
+    setprop debug.sf.showfps    0
+    setprop debug.sf.enable_hgl 1
+    setprop debug.egl.hw        1
+
+    setprop hwc.stretch.filter  1
+    setprop hwc.enable_dither   1
+
+    setprop media.omxgm.enable-player 0
+    setprop media.omxgm.enable-record 0
+    setprop media.omxgm.enable-scan 0
+    setprop rw.VIDEO_RENDER_NAME video_render.surface
+
+    # Camera
+    setprop camera.disable_zsl_mode 1
+    setprop back_camera_name sr200pc20
+    setprop back_camera_orient 0
+    setprop front_camera_orient 0
+
+    setprop ro.opengles.version 131072
+    setprop ro.sf.hwrotation 0
+    setprop ro.sf.lcd_density 160
+
+    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
+    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
+    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+    chown root system /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+    chmod 0440 /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
+    chown root system /sys/devices/system/cpu/cpu0/online
+    chmod 0664 /sys/devices/system/cpu/cpu0/online
+    chown root system /sys/devices/system/cpu/cpu1/online
+    chmod 0664 /sys/devices/system/cpu/cpu1/online
+
+    setprop gsm.ril.delay 15
+    setprop ro.ril.wake_lock_timeout 300
+
+    # Backlight (pwm-backlight sysfs class)
+    setprop hw.backlight.dev "pwm-backlight.0"
+    chown system system /sys/class/backlight/pwm-backlight.0/brightness
+    chmod 0660 /sys/class/backlight/pwm-backlight.0/brightness
+
+    # Light sensor
+    setprop ro.hardware.lightsensor "/sys/class/i2c-dev/i2c-2/device/2-0044/"
+    setprop ro.lightsensor.threshold  20
+
+    setprop wlan.interface wlan0
+
+    mount debugfs none /sys/kernel/debug/
+
+    # Marvell sd8787 (SDIO WiFi) is loaded by the wifi_load service below.
+
+# Emulated internal storage (/sdcard -> /storage/emulated/legacy). Stock served
+# p7 (/eMMCp7/media); this uses /data/media on the much larger p4 instead.
+service audio_init /system/bin/audio_init.sh
+    class late_start
+    user root
+    oneshot
+
+service sdcard /system/bin/sdcard -t4 /data/media /mnt/shell/emulated 1023 1023
+    class late_start
+
+# KitKat framework: a primary supplicant plus a separate p2p supplicant (WifiService
+# starts "p2p_supplicant" when P2P is enabled), both talking to the framework through
+# control sockets in /data/misc/wifi/sockets and the abstract global socket.
+service p2p_supplicant /system/bin/wpa_supplicant \
+    -ip2p0 -Dnl80211 -c/data/misc/wifi/p2p_supplicant.conf \
+    -e/data/misc/wifi/entropy.bin -N \
+    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf \
+    -O/data/misc/wifi/sockets -g@android:wpa_wlan0
+    class main
+    socket wpa_wlan0 dgram 660 wifi wifi
+    disabled
+    oneshot
+
+service wpa_supplicant /system/bin/wpa_supplicant \
+    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf \
+    -O/data/misc/wifi/sockets \
+    -e/data/misc/wifi/entropy.bin -g@android:wpa_wlan0
+    class main
+    socket wpa_wlan0 dgram 660 wifi wifi
+    disabled
+    oneshot
+
+service mlan2040coex /system/bin/mlan2040coex -i wlan0
+    class main
+    disabled
+
+# Resets the chip, insmods mlan/sd8787 with stock parameters, then runs mlaninit.sh.
+service wifi_load /system/bin/wifi_load.sh
+    class late_start
+    user root
+    oneshot
+
+# Started by the framework (DhcpStateMachine) via ctl.start dhcpcd_wlan0:<args>;
+# without it the UI sits on "Obtaining IP address" forever.
+service dhcpcd_wlan0 /system/bin/dhcpcd -ABKL
+    class late_start
+    disabled
+    oneshot
+
+service iprenew_wlan0 /system/bin/dhcpcd -n
+    class late_start
+    disabled
+    oneshot
+
+service wifi_reset /system/bin/wifi_reset.sh
+    class late_start
+    disabled
+    oneshot
+
+service cp_calib /system/bin/copy_calib.sh
+    class late_start
+    oneshot

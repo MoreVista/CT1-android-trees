@@ -1,0 +1,2 @@
+add_lunch_combo cm_41EA04-eng
+add_lunch_combo cm_41EA04-userdebug

@@ -1,0 +1,18 @@
+diff --git a/libs/gui/BufferQueue.cpp b/libs/gui/BufferQueue.cpp
+index f7b1bee07..f651fa7a1 100644
+--- a/libs/gui/BufferQueue.cpp
++++ b/libs/gui/BufferQueue.cpp
+@@ -353,7 +353,12 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>* outFence, bool async
+             // See whether a buffer has been queued since the last
+             // setBufferCount so we know whether to perform the min undequeued
+             // buffers check below.
+-            if (mBufferHasBeenQueued) {
++            // Freescale: the VPU decoder holds every buffer it is given (the stock,
++            // pre-JDQ39E BufferQueue had no such check), so the check is skipped for the
++            // FSL YUV formats (0x100-0x103) the decoder uses. GL clients must keep it,
++            // otherwise they can dequeue every free buffer and then deadlock.
++            const bool fslVideoFormat = (format >= 0x100 && format <= 0x103);
++            if (mBufferHasBeenQueued && !fslVideoFormat) {
+                 // make sure the client is not trying to dequeue more buffers
+                 // than allowed.
+                 const int newUndequeuedCount = maxBufferCount - (dequeuedCount+1);

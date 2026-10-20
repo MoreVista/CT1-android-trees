@@ -1,0 +1,28 @@
+diff --git a/services/input/EventHub.cpp b/services/input/EventHub.cpp
+index 4d70d5f1..a82e7dfc 100644
+--- a/services/input/EventHub.cpp
++++ b/services/input/EventHub.cpp
+@@ -309,6 +309,23 @@ status_t EventHub::getAbsoluteAxisInfo(int32_t deviceId, int axis,
+                 outAxisInfo->flat = info.flat;
+                 outAxisInfo->fuzz = info.fuzz;
+                 outAxisInfo->resolution = info.resolution;
++
++                // Optional per-device override of the reported range from the
++                // .idc file (abs.<axis code>.min / abs.<axis code>.max). Needed
++                // for digitizers whose driver declares a wider range than the
++                // one they actually produce (e.g. rohm_bu21025 on 40S404).
++                if (device->configuration) {
++                    int32_t v;
++                    char key[32];
++                    snprintf(key, sizeof(key), "abs.%d.min", axis);
++                    if (device->configuration->tryGetProperty(String8(key), v)) {
++                        outAxisInfo->minValue = v;
++                    }
++                    snprintf(key, sizeof(key), "abs.%d.max", axis);
++                    if (device->configuration->tryGetProperty(String8(key), v)) {
++                        outAxisInfo->maxValue = v;
++                    }
++                }
+             }
+             return OK;
+         }

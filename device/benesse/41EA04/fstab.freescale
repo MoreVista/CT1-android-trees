@@ -1,0 +1,9 @@
+# Android fstab file, reused verbatim from the stock unit's runtime fstab
+# (adb-pulled /fstab.freescale, 2026-09-27). p1/p2/p3/p8 are deliberately
+# not listed here, same as stock -- boot/recovery/misc-equivalent and
+# factory are not mounted by the running OS.
+#<src>                                                  <mnt_point>         <type>    <mnt_flags>                                                                         <fs_mgr_flags>
+/dev/block/mmcblk0p5    /system  ext4    ro                                                                               wait
+/dev/block/mmcblk0p4    /data    ext4    nosuid,nodev,nodiratime,noatime,nomblk_io_submit,noauto_da_alloc,errors=panic,discard    wait
+/dev/block/mmcblk0p6    /cache   ext4    nosuid,nodev,nomblk_io_submit,discard                                                    wait
+/dev/block/mmcblk0p7    /factory ext4    nosuid,nodev                                                                     wait
