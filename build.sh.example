@@ -1,2 +1,4 @@
-cd /mnt/hdd/40s404-cm12/src
-docker run --rm -u $(id -u):$(id -g) -v /mnt/hdd/40s404-cm12/src:/src -v <your-dir>/android_device_benesse_40S404:/src/device/benesse/40S404 -v <your-dir>/vendor_benesse_40S404:/src/vendor/benesse/40S404 -v /mnt/hdd/ccache:/ccache -w /src cm11-build:14.04 bash -lc "export USE_CCACHE=1 CCACHE_DIR=/ccache; source build/envsetup.sh >/dev/null; lunch cm_40S404-userdebug >/dev/null; $1"
+#!/bin/bash
+# usage: build.sh '<make command>'   e.g. build.sh 'mka bacon'
+# The author ran this inside a bubblewrap Ubuntu 14.04 chroot ("loshell"); adapt to your own build environment.
+exec <your-chroot-launcher> bash -lc "source build/envsetup.sh >/dev/null 2>&1; lunch cm_40S404-userdebug >/dev/null 2>&1; $1"
