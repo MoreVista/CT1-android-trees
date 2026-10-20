@@ -1,12 +1,12 @@
-# Android 4.4 (CyanogenMod 11) on the Benesse 40S404
+# Android 5.1 (CyanogenMod 12.1) on the Benesse 40S404
 
-Branch `android-4.4-cm11` (ROM base: CyanogenMod 11 (cm-11.0)). See the repository's `main` branch for the overview and for what is not included.
+Branch `android-5.1-cm12.1` (ROM base: CyanogenMod 12.1 (cm-12.1)). See the repository's `main` branch for the overview and for what is not included.
 
-Status: boots, display/touch/Wi-Fi/audio/VPU video work. Details: `device/benesse/40S404/NOTES.md`. The sibling tablet 41EA04 is on branch `android-4.4-cm11-41EA04`.
+Status: used as a daily ROM on the author's tablet: display (v_hwc), touch, Wi-Fi, audio, sensors, SD card, VPU video work. **Camera does not work** (see NOTES.md, section on the camera). Details: `device/benesse/40S404/NOTES.md`.
 
 ## Build
 
-Source tree: `repo init -u https://github.com/CyanogenMod/android.git -b cm-11.0` (the CyanogenMod GitHub organisation is archived: use the LineageOS mirrors of the same project names, `repo sync -c --no-tags`). Build environment: Ubuntu 14.04 userland (the author used a Docker image, see `build.sh.example`).
+Source tree: `repo init -u https://github.com/CyanogenMod/android.git -b cm-12.1 --depth=1` (CyanogenMod organisation is archived: use the LineageOS mirrors; `prebuilts/tools` and `prebuilts/qemu-kernel` are needed, `external/qemu` can be removed). Build environment: Ubuntu 14.04 userland (the author used a Docker image, see `build.sh.example`).
 
 1. Put the stock blobs in place: `cd vendor/benesse/40S404 && ./extract-files.sh` (see `vendor/benesse/40S404/README.md`).
 2. Provide `device/benesse/40S404/prebuilt/zImage` (the stock kernel).

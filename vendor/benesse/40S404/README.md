@@ -15,3 +15,5 @@ this repository. Create it from the stock firmware of the same tablet:
   (`extract-files.sh` does this copy).
 * `hw/audio.primary.imx6.so`: `patchelf --replace-needed libtinyalsa.so libtinyfsl.so hw/audio.primary.imx6.so`
   (so the audio HAL uses the stock tinyalsa instead of the AOSP one).
+* `hw/camera.imx6.so`: `patchelf --add-needed libjhead.so hw/camera.imx6.so` (the Lollipop+ linker only searches the direct
+  dependencies of a dlopen()ed library).
