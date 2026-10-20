@@ -173,3 +173,180 @@ Iteration shortcut: `adb root` (needs Settings > Developer options > Root access
     (patches/frameworks_base-hwui-roundrect-texture.patch).
 11. screencap is black/white (SurfaceFlinger GL read-back unsupported); to look at the screen use a framebuffer dumper
     (open /dev/graphics/fb0, mmap, dump the page at yoffset; the pages repeat).
+
+## LineageOS 14.1 (7.1.2) -- performance / graphics findings
+
+Debug root: `WITH_SU := true` (cm.mk) + `su_daemon` service in init.freescale.rc (this init does not read
+/system/etc/init). `adb root` works (adbd is patched for the SELinux-less kernel); if `adb root` leaves the
+host stuck, `adb kill-server` and retry. After a reboot adbd is non-root again.
+
+1. **UI slow (~10 fps)** -- LiveDisplay (night colour temperature) sends a non-identity colour matrix to
+   SurfaceFlinger (transaction 1030); `SurfaceFlinger_hwc1.cpp` then marks every layer HWC_SKIP_LAYER and
+   composites all on the GC880 with an extra colour shader. Fix: `overlay/vendor/cmsdk/.../config.xml`
+   (LiveDisplay off by default) and `patches/frameworks_native-sf-hwc-policy.patch` (identity matrix = none).
+2. **Screen corruption with HWC enabled** -- the stock Freescale v_hwc blit composition corrupts the screen on
+   N. SurfaceFlinger now composites with GLES unless `ro.sf.use_hwc=1` (same patch). Cost: ~26-36 ms/frame
+   scrolling Settings vs ~9 ms with v_hwc.
+3. **App cold start ~3 s** -- libEGL's Loader::init_api() asked the Vivante eglGetProcAddress() for ~8700 names
+   per process; every unanswered call dlopen()s (libGAL gcoOS_LoadLibrary) and Android 7's linker does ~50
+   mprotect() per dlopen (found with `strace -f -tt` on the app: 55k mprotect, 457 dlopen of libGLESv1_CM.so).
+   The only names it resolved beyond dlsym() were 49 unadvertised stubs (APPLE/NV/QCOM/IMG). Fix:
+   `patches/frameworks_native-libegl-loader.patch` (dlsym only; `debug.egl.use_gpa=1` restores the old
+   behaviour). Settings 3.6 s -> 1.4 s, Calculator 3.0 s -> 1.3 s.
+4. **zygote GL preload still impossible** (`ro.zygote.disable_gl_preload=true` stays): the Vivante libs open
+   /dev/galcore in a static constructor, so the zygote's galcore fd/GAL state is shared with every forked child
+   and a Vivante thread in system_server dies with SIGSEGV (fault addr 0x903100) ~20 s after start.
+5. ART is NOT the bottleneck: `cmd package compile -m speed` on Calculator changed nothing; JIT stays off.
+   /system is 96 % full, so no system-wide dexpreopt anyway.
+6. Misleading numbers: `top` shows ~25-50 % IOW at idle (ipu1_task kthreads sit in D state) and load average
+   ~5; `adb shell screencap` is all-black (GL readback); with CM ROMs the 41EA04 reports the same adb serial
+   (0123456789ABCDEF) -- always select the device by `adb -t <transport_id>` after checking ro.product.device.
+
+### v_hwc (hardware composer) corruption -- investigation log (2026-10-17)
+
+Tooling: `/dev/graphics/fb0` is readable as root; a tiny static C tool (`fbcap`, built with the tree's
+arm-linux-androideabi-gcc + ndk android-10 sysroot) reads `FBIOGET_VSCREENINFO.yoffset` and copies the page
+that is actually displayed (yres_virtual=2304 = 3 pages); frames converted with PIL (BGRA). This beats
+screencap (all black). Capture ~24 frames while swiping the launcher.
+Do NOT toggle HWC at run time (`service call SurfaceFlinger 1008`): it left apps with
+"dequeueBuffer: attempting to exceed the max dequeued buffer count (2)" -> EGL_BAD_NATIVE_WINDOW ->
+HWUI "halting rendering" (frozen Launcher/StatusBar). Use ro.sf.use_hwc=1 + reboot for experiments.
+
+Symptom with ro.sf.use_hwc=1: in ~5-8 % of frames of a scrolling animation the composed frame (as stored in
+the displayed fb page) has horizontal bands from different frames: wallpaper polygon edges notched at a
+fixed y, launcher icon labels clipped. Static screens, Settings scrolling and GLES composition are clean.
+The displayed page is never modified after flip (checked with `fbmut`), so the tear is inside the composed
+result, not scan-out.
+Facts about hwcomposer_viv.imx6.so: no sync_wait import (acquire fences ignored); g2d_finish() of the
+blits is deferred to the next compose (flag at ctx+172); it has Area/owners bookkeeping.
+Tried without effect: debug.egl.finish=1; Layer maxAcquiredBufferCount=2; forcing HWC_GEOMETRY_CHANGED
+every frame. Marking only the wallpaper SKIP makes v_hwc fall back to GLES for *all* layers (no hybrid).
+Conclusion: keep GLES composition (ro.sf.use_hwc unset); resolving the tear needs reverse engineering of
+hwcComposeG2D (Area splitting) or a replacement HWC.
+
+## LineageOS 14.1 -- flashing / release checklist (2026-10-17)
+
+* Flash: `adb reboot recovery` (TWRP, serial <40S404-twrp-serial>) -> `adb push <zip> /data/los14.zip` -> `twrp install /data/los14.zip`
+  -> `twrp wipe dalvik` -> reboot. The first boot after an OTA takes ~5-10 min (installd dex2oat of the
+  framework jars); do not judge it before sys.boot_completed.
+* **make never deletes stale files from `out/target/product/40S404/system`.** A leftover `lib/hw/power.imx6.so`
+  (stock power HAL, removed from the vendor makefile long ago) ended up in the first full image and made
+  system_server die with SEGV_ACCERR right after PowerManagerService init ("SWITCHPROFILE ... Power HAL" in
+  logcat is the tell-tale). Delete stale output files after removing something from a makefile, then rebuild.
+* WebView: `adb install webview/WebViewGoogle.apk` (user app, not part of the image; /system is 96 % full).
+* The kernel cmdline is plain again (no user_debug, no init=/init); u-boot appends ~88 chars, total < 300.
+
+### App freezes: "attempting to exceed the max dequeued buffer count" (2026-10-17)
+
+Symptom: opening the Launcher's all-apps list froze the Launcher (no redraw). Log: `BufferQueueProducer: [..Launcher]
+dequeueBuffer: attempting to exceed the max dequeued buffer count (2)` followed by HWUI `swapBuffers encountered EGL error
+12299 ... halting rendering...`; HWUI then drops the surface for good. Reproduced in ~25 % of drawer opens
+(`sendevent` tap loop, see drawer3.sh idea: tap 512,672 / tap 512,744 with 0.8 s sleeps; `input tap` itself spawns a JVM
+and drives the 800 MB device into the low-memory killer, which makes the test meaningless).
+Cause: the Vivante EGL dequeues the next buffer before the previous frame's queueBuffer has landed in SurfaceFlinger, so
+for a moment 3 buffers are dequeued; maxDequeued is 2. Raising maxDequeued to 3 does not help (still fails).
+Fixes: (1) `ro.bq.dequeue_wait_ms=100` -- libgui BufferQueueProducer waits for the in-flight queue instead of failing
+(patches/frameworks_native-bq-dequeue-wait.patch, also contains an inactive `ro.bq.min_max_dequeued` clamp);
+result 0 failures / 100 opens. (2) HWUI safety net: on a failed swap re-create the EGL surface instead of dropping it
+(patches/frameworks_base-hwui-swap-recover.patch).
+The producer side runs inside surfaceflinger, so libgui changes need a reboot (zygote restart is not enough).
+
+### Video playback (FSL VPU) on N (2026-10-17)
+
+Result: H.264 (320x240, 848x480) plays through the VPU decoder `OMX.Freescale.std.video_decoder.avc.v3.hw-based`
+with CPU rendering (ACodec software-renderer route), ~28 fps for 480p at ~27 % CPU. Zero-copy (native window, HAL
+formats 0x100-0x103, persist.sys.fsl.hwrender=1) is NOT ported to N; 720p+ is untested.
+Why it did not work, in order (each hid the next):
+1. AOSP 7.1 MediaCodecList instantiates every XML codec once (QueryCapabilities) and drops the ones that fail, silently
+   -> all OMX.Freescale.* vanished and OMX.google.* (software) was used. Look for `FAILED to allocate omx component`.
+2. dlopen of the VPU chain failed: lib_id3_parser needs `String8::setTo(unsigned short const*, unsigned)` (char16_t
+   mangling changed) -> shim in libutils/VectorImplShims.cpp.
+3. The components run in the `media.codec` process (uid mediacodec) which could not open /dev/mxc_vpu and /dev/ion
+   (0660 media:system) -> ueventd.freescale.rc 0666.
+4. libvpu calls g2d_alloc -> gcoOS_AllocateVideoMemory without constructing the Vivante GAL; in media.codec nobody did
+   (SIGSEGV, fault addr 0x10 in libGAL) -> OMXMaster calls g2d_open() once (fslInitGal).
+5. ACodec: FSL components cannot take the native-window route (gralloc rejects the raw OMX colour format, ENOMEM) ->
+   treat OMX.Freescale.* like OMX.MARVELL.* (forceSwRenderer).
+6. The decoder advertises stride/slice-height 0 -> SoftwareRenderer put the chroma planes at offset 0 (garbage grid) ->
+   fall back to nFrameWidth/nFrameHeight in ACodec::getPortFormat.
+Tools that made this possible: `debuggerd` is useless on this kernel (its worker times out; the waitpid patch only stops
+the murder-suicide), so `crashpc` (ptrace + PTRACE_O_TRACECLONE, prints regs/stack/maps at SIGSEGV) located the crash;
+`debug.ld.all=dlerror` shows the real dlopen error; `setprop debug.stagefright.omx-debug 5` traces OMX calls.
+Known limit: the VPU buffers come from the 176 MB galcore pool; after many playbacks the pool can be exhausted
+("_IOGetPhyMem: gpu allocator failed") until reboot.
+
+### v_hwc retry (2026-10-18/19) -- STATUS: root cause found and fixed (HWC composition is the default)
+**Real root cause: pan/vsync race.** v_hwc composes into one of two fb pages (yoffset 0/768 of a 3-page
+yres_virtual=2304) and calls FBIOPAN_DISPLAY. On this IPU/MXC fb (kernel 3.0.35) the pan only takes effect at the *next
+vsync* (panel period 17.84 ms), and the ioctl returns earlier. If SurfaceFlinger starts composing the next frame
+immediately, v_hwc blits into the page that is still being scanned out -> the visible "old picture / shifted band"
+flicker. (strace -f -tt -T of surfaceflinger plus reading drivers/video/mxc/mxc_ipuv3_fb.c made this visible; the
+GLES path goes through the fb HAL which waits, hence no flicker there.)
+Fix (`patches/frameworks_native-sf-hwc-policy.patch`): after `hwc.commit()` SurfaceFlinger calls
+`MXCFB_WAIT_FOR_VSYNC` (`_IOR('F', 0x20, unsigned long long)`) on /dev/graphics/fb0 (fslWaitPanVsync,
+`ro.sf.hwc_wait_vsync`, default on). The user confirmed the flicker is gone and scrolling is acceptable.
+Earlier, weaker mitigation kept as is: a bounded GPU barrier before `hwc.commit()` (EGL fence, 30 ms cap,
+RenderEngine::finishWithTimeout, `ro.sf.hwc_gl_finish`, default on). It reduced some 3D-resolve-vs-2D-blit banding
+but was NOT the cause of the flicker; it may be unnecessary now (unverified). An unbounded glFinish() once preceded a
+full device freeze, hence the bound.
+**Caveat on measurements:** the "tear rates" from fb-page sampling (fbcap/tear4.py) were partly artifacts: reading a
+3 MB page slowly while it is being rewritten tears the *capture*. Do not trust them; use strace/kernel reading.
+HWC composition is the default (`ro.sf.use_hwc`, default 1); fallback `ro.sf.use_hwc=0` in /system/build.prop forces
+GLES composition (slow, 26-36 ms/frame vs ~5-9 ms, but tear-free). Do NOT toggle HWC at run time.
+Tools used (sources only in the session; `tools/sftest` is the EGL solid-colour client): fbcap (page capture),
+crashpc (ptrace SIGSEGV dumper), strace of surfaceflinger. Avoid `input tap/swipe` on the device (spawns a JVM and
+drives it into LMK); use sendevent scripts.
+
+### Final validation (2026-10-19)
+Zip lineage-14.1-20261019-UNOFFICIAL-40S404 (sha256 ce01a541...a80b) flashed via TWRP. User-verified on the tablet: no flicker
+(HWC composition with pan-vsync wait), scrolling OK, audio, SD card / MTP and sensors work. Open: camera, zero-copy/720p+ video.
+
+### Zero-copy video decode (FSL VPU -> gralloc -> v_hwc) on N (2026-10-20)
+Result: H.264 1080p30 plays with 0-8 % late frames (was 65 % dropped with CPU copy), 720p 0-5 %, CPU mostly idle (the
+VPU decodes straight into gralloc buffers, v_hwc scales/blits them with the 2D core). `persist.sys.fsl.hwrender`
+(default 1; 0 = old CPU/SoftwareRenderer route) is read when the codec is configured, so it can be flipped without reboot.
+Patches: `frameworks_av-fsl-vpu-swrender-n.patch` (ACodec/OMXNodeInstance) and `frameworks_native-bq-dequeue-wait.patch`
+(BufferQueueProducer). What was needed, in order:
+1. ACodec: raw OMX colour formats are mapped to the i.MX gralloc formats (19->0x101, 21->0x103, 22->0x100); the
+   forceSwRenderer route is skipped for OMX.Freescale.* when hwrender=1.
+2. OMXNodeInstance::useGraphicBuffer: the stock OMX wrapper expects the JB-4.2 GraphicBuffer layout and recovers the
+   buffer with "ptr - 4" -> hand it `ptr + 4` (same trick as on CM12).
+3. The VPU registers its frame buffers only when it has been given ALL nBufferCountActual output buffers (fillBuffer for
+   every one; holding back minUndequeued for the window = decoder silently stalls, no FBD ever). So the FSL path sets
+   minUndequeued=0 (everything goes to the decoder), and mNumUndequeuedBuffers=1 afterwards so flush/teardown does not wait
+   for the frame SurfaceFlinger is showing.
+4. nBufferCountActual = max(component's own value, nBufferCountMin + 1 + debug.fsl.extrabufs(4)). NEVER below the
+   component's own value: after the sequence init it raises Actual itself (e.g. 11 for a stream with many reference
+   frames) and if fewer buffers are registered the VPU library reads garbage "frames" (ASCII text as physical addresses)
+   and the VPU DMAs into random RAM -> every process segfaults (this crashed the whole system with Disco.240p once).
+   extrabufs=2 stalls the decoder, 7 starves the GPU pool; 4 (= min+5, what the component allocates itself) is right.
+5. BufferQueueProducer::waitForFreeSlotThenRelock: no "exceed max dequeued buffer count" error for the FSL YUV formats
+   (0x100-0x103): the decoder holds every buffer, dequeue then blocks until SurfaceFlinger releases one.
+6. ACodec: after the very first rendered frame the refill dequeue is skipped (`mFslFirstRenderDone`): nothing is free
+   yet and SurfaceFlinger only releases frame 1 once frame 2 is on screen -> blocking would deadlock the looper.
+Not working / limits: WebView `<video>` (Jelly) shows no picture with hwrender 0 or 1 (pre-existing; its decoder also
+sees dequeueBuffer WOULD_BLOCK on the SurfaceTexture, which the FSL path does not retry); VP8 (OMX.Freescale vpx
+configureCodec fails, OMX.google.vpx.decoder cannot be instantiated either); the GPU (galcore) memory pool of 176 MB
+fills up after ~10 plays (force-stop style tests): galcore then SIGKILLs apps ("<gpu> send sigkill" in dmesg), restarting
+SurfaceFlinger (`setprop ctl.restart surfaceflinger`) gives the memory back, killing media.codec/mediaserver does not.
+Test clips: gst-launch videotestsrc (ball) + x264enc (profile=high), see /tmp in the session; `dumpsys media.player` shows
+numFramesTotal/numFramesDropped; panel pages can be dumped with `cat /dev/graphics/fb0` (3 pages of 1024x768 RGBA).
+Flashed 2026-10-20: lineage-14.1-20261019-UNOFFICIAL-40S404.zip (with zero-copy video); 720p/1080p/240p/480p verified, 0 drops.
+
+### WebView `<video>` shows no picture (investigated 2026-10-20, NOT solved)
+Jelly + com.google.android.webview 95 on N: the `<video>` rectangle stays transparent although decoding runs
+(readyState 4, currentTime advances, getVideoPlaybackQuality().totalVideoFrames grows) -- with OMX.Freescale (hwrender 0 and 1)
+and with OMX.google.h264 alike, at 240p..1080p. Findings:
+- `canvas.drawImage(video)` DOES show the frame -> MediaCodec -> SurfaceTexture -> GL copy works inside Chromium; only the
+  compositor's video quad is never drawn (render-pass dump contains only PictureContent + SolidColor quads).
+- The platform side is fine: `tools/textest` (TextureView + MediaPlayer, getBitmap() pixel statistics) displays 720p video
+  correctly, including the zero-copy FSL gralloc formats through GLConsumer/GL_TEXTURE_EXTERNAL_OES.
+- While the page plays video Chromium logs "tile_manager.cc: tile memory limits exceeded" every frame (4x on a plain page);
+  --disable-low-end-device-mode, --force-gpu-mem-available-mb, --disable(enable)-gpu-rasterization,
+  --disable-features=UseSurfaceLayerForVideo / MediaCodecAsyncApi / AImageReaderVideoOutput made no difference.
+  Chromium's media VLOGs are compiled out of the release WebView, so the exact reason is unknown (suspect: Skia's external-OES
+  sampling shader on the Vivante GLES2 driver, or the SurfaceTexture quad path).
+- Debug aids: userdebug honours /data/local/tmp/webview-command-line (first token is a dummy, e.g. `_ --enable-logging=stderr
+  --v=3`), `adb reverse tcp:8000 tcp:8000` + `python3 -m http.server` to serve test pages. Every WebView launch costs galcore
+  memory: after ~10 launches `<gpu> send sigkill` kills the browser; `setprop ctl.restart surfaceflinger` resets the pool.
+- Ideas not tried: another WebView build (e.g. AOSP/Chromium ~M55-M70 GL renderer), Vivante shader-compile logging.

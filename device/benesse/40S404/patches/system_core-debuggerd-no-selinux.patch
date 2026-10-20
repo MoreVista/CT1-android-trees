@@ -1,0 +1,16 @@
+diff --git a/debuggerd/debuggerd.cpp b/debuggerd/debuggerd.cpp
+index 6189a76..100197e 100644
+--- a/debuggerd/debuggerd.cpp
++++ b/debuggerd/debuggerd.cpp
+@@ -165,6 +165,11 @@ static bool selinux_action_allowed(int s, debugger_request_t* request)
+ 
+   perm = debuggerd_perms[request->action];
+ 
++  // 40S404: kernel without SELinux -> there is no policy to consult, allow.
++  if (is_selinux_enabled() <= 0) {
++    return true;
++  }
++
+   if (getpeercon(s, &scon) < 0) {
+     ALOGE("Cannot get peer context from socket\n");
+     goto out;

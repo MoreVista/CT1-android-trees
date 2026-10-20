@@ -1,0 +1,50 @@
+diff --git a/opengl/libs/EGL/Loader.cpp b/opengl/libs/EGL/Loader.cpp
+index 4234db8..e1d7ace 100644
+--- a/opengl/libs/EGL/Loader.cpp
++++ b/opengl/libs/EGL/Loader.cpp
+@@ -290,6 +290,17 @@ status_t Loader::close(void* driver)
+     return NO_ERROR;
+ }
+ 
++// Old vendor drivers (Vivante) implement eglGetProcAddress() with a dlsym(RTLD_DEFAULT)
++// fallback, which hands back this wrapper's own entry points for names the driver
++// does not implement (e.g. eglSwapBuffersWithDamageKHR) and makes them call themselves.
++static bool is_own_symbol(void* f) {
++    Dl_info a, b;
++    memset(&a, 0, sizeof(a));
++    memset(&b, 0, sizeof(b));
++    if (!f || !dladdr((void*)&is_own_symbol, &a) || !dladdr(f, &b)) return false;
++    return a.dli_fbase != NULL && a.dli_fbase == b.dli_fbase;
++}
++
+ void Loader::init_api(void* dso,
+         char const * const * api,
+         __eglMustCastToProperFunctionPointerType* curr,
+@@ -304,8 +315,17 @@ void Loader::init_api(void* dso,
+         __eglMustCastToProperFunctionPointerType f =
+             (__eglMustCastToProperFunctionPointerType)dlsym(dso, name);
+         if (f == NULL) {
+-            // couldn't find the entry-point, use eglGetProcAddress()
+-            f = getProcAddress(name);
++            // The 40S404's Vivante eglGetProcAddress() does a dlopen() for every call it cannot
++            // answer, and Android 7's linker makes each of those cost ~50 mprotect() calls.  This
++            // loop asks for ~8700 names per process (about 3 s at every app start), and the only
++            // names it ever resolves that dlsym() cannot are the driver's stubs for extensions
++            // it does not advertise (APPLE/NV/QCOM/IMG).  So rely on dlsym() alone, unless
++            // debug.egl.use_gpa=1 is set.
++            static const bool useGpa = property_get_bool("debug.egl.use_gpa", false);
++            if (useGpa) {
++                f = getProcAddress(name);
++                if (is_own_symbol((void*)f)) f = NULL;
++            }
+         }
+         if (f == NULL) {
+             // Try without the OES postfix
+@@ -543,6 +563,7 @@ void *Loader::load_driver(const char* kind,
+             if (f == NULL) {
+                 // couldn't find the entry-point, use eglGetProcAddress()
+                 f = getProcAddress(name);
++                if (is_own_symbol((void*)f)) f = NULL;
+                 if (f == NULL) {
+                     f = (__eglMustCastToProperFunctionPointerType)0;
+                 }

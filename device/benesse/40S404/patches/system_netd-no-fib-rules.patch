@@ -1,0 +1,18 @@
+diff --git a/server/RouteController.cpp b/server/RouteController.cpp
+index 4de3c9a..94d8f11 100644
+--- a/server/RouteController.cpp
++++ b/server/RouteController.cpp
+@@ -345,6 +345,13 @@ WARN_UNUSED_RESULT int modifyIpRule(uint16_t action, uint32_t priority, uint8_t
+     for (size_t i = 0; i < ARRAY_SIZE(AF_FAMILIES); ++i) {
+         rule.family = AF_FAMILIES[i];
+         if (int ret = sendNetlinkRequest(action, flags, iov, ARRAY_SIZE(iov))) {
++            // Kernel 3.0.35 (40S404) is built without CONFIG_IP_ADVANCED_ROUTER, so IPv4 has no
++            // policy routing (no fib rules): every route lands in the main table. Tolerate that
++            // so that single-interface networking still comes up.
++            // (EINVAL: no FRA_UID_START/END support, i.e. uid-range rules.)
++            if (ret == -EAFNOSUPPORT || ret == -EINVAL) {
++                continue;
++            }
+             return ret;
+         }
+     }

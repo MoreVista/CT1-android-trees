@@ -20,12 +20,10 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/ueventd.freescale.rc:root/ueventd.freescale.rc \
     $(LOCAL_PATH)/fstab.freescale:root/fstab.freescale \
     $(LOCAL_PATH)/wifi_load.sh:system/bin/wifi_load.sh \
-    $(LOCAL_PATH)/vold.fstab:system/etc/vold.fstab \
     $(LOCAL_PATH)/media_codecs.xml:system/etc/media_codecs.xml \
     $(LOCAL_PATH)/audio_init.sh:system/bin/audio_init.sh \
-    $(LOCAL_PATH)/idc/rohm_bu21025.idc:system/usr/idc/rohm_bu21025.idc \
-    system/core/rootdir/init.usb.rc:root/init.usb.rc \
-    system/core/rootdir/init.trace.rc:root/init.trace.rc
+    $(LOCAL_PATH)/idc/rohm_bu21025.idc:system/usr/idc/rohm_bu21025.idc
+
 
 # Hardware feature declarations (stock shipped these; without android.hardware.wifi
 # Settings hides the Wi-Fi entry entirely).
@@ -40,12 +38,10 @@ PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/android.hardware.location.xml:system/etc/permissions/android.hardware.location.xml
 
 PRODUCT_PACKAGES += \
-    Launcher2 \
     wpa_supplicant \
     wpa_supplicant.conf \
     dhcpcd.conf \
     hostapd \
-    wifi_tether \
     libwpa_client \
     hostapd_cli \
     wpa_cli
@@ -58,7 +54,17 @@ PRODUCT_PACKAGES += \
 PRODUCT_PROPERTY_OVERRIDES += \
     qemu.hw.mainkeys=0 \
     persist.sys.fsl.hwrender=1 \
-    ro.zygote.disable_gl_preload=true
+    ro.zygote.disable_gl_preload=true \
+    debug.hwui.render_dirty_regions=false \
+    ro.bq.gpu_to_cpu_unsupported=1 \
+    ro.bq.dequeue_wait_ms=100
+# ro.bq.dequeue_wait_ms=100: BufferQueueProducer waits up to 100 ms for an in-flight queueBuffer before failing a
+# dequeue with "attempting to exceed the max dequeued buffer count"; the Vivante EGL dequeues the next buffer
+# before the previous queue has landed, and a failed dequeue froze apps (HWUI halting rendering).
+# ro.bq.gpu_to_cpu_unsupported=1: SurfaceFlinger screenshots (screencap, Recents thumbnails) rendered all-zero
+# buffers through the EGLImage FBO path on the Vivante driver; this makes it use glReadPixels instead.
+# debug.hwui.render_dirty_regions=false: the Vivante EGL does not keep the previous frame
+# (EGL_SWAP_BEHAVIOR_PRESERVED), so HWUI partial redraw flickers; redraw whole frames.
 
 # NOTE: build as cm_40S404-userdebug: eng forces ro.kernel.android.checkjni=1 (build/core/main.mk),
 # CheckJNI verifies every JNI call and is very slow on a Cortex-A9.
@@ -81,3 +87,16 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # Personal dev tablet: skip the adb RSA authorisation dialog (userdebug defaults to secure).
 ADDITIONAL_DEFAULT_PROPERTIES += ro.adb.secure=0
+
+# WebView: the prebuilt WebViewGoogle APK (webview/WebViewGoogle.apk, shared with the TAB-A03 port) is 79 MB on
+# /system, which does not fit the 504 MB system partition. Install it as a normal app after flashing instead:
+#   adb install -r device/benesse/40S404/webview/WebViewGoogle.apk
+# (com.google.android.webview is an available WebView provider in vendor/cm's config_webview_packages.xml).
+# The framework-side WebView loader/plat support libraries are still built into /system.
+PRODUCT_PACKAGES += \
+    libwebviewchromium_loader \
+    libwebviewchromium_plat_support
+
+# Android 7 ART JIT: system_server dies with SEGV_ACCERR (0x64xxxxxx) right after PowerManagerService starts
+# on this 3.0.35 kernel. JIT is switched off in build/target/product/runtime_libart.mk of this tree
+# (patches/build-runtime_libart-no-jit.patch): interpreter + AOT only, until the JIT code cache is understood.

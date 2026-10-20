@@ -1,0 +1,90 @@
+diff --git a/include/gui/BufferQueueProducer.h b/include/gui/BufferQueueProducer.h
+index 8f613ee..e3f5caf 100644
+--- a/include/gui/BufferQueueProducer.h
++++ b/include/gui/BufferQueueProducer.h
+@@ -204,7 +204,8 @@ private:
+         Dequeue,
+         Attach,
+     };
+-    status_t waitForFreeSlotThenRelock(FreeSlotCaller caller, int* found) const;
++    status_t waitForFreeSlotThenRelock(FreeSlotCaller caller, int* found,
++            bool skipMaxDequeuedCheck = false) const;
+ 
+     sp<BufferQueueCore> mCore;
+ 
+diff --git a/libs/gui/BufferQueueProducer.cpp b/libs/gui/BufferQueueProducer.cpp
+index ff85eb5..0573592 100644
+--- a/libs/gui/BufferQueueProducer.cpp
++++ b/libs/gui/BufferQueueProducer.cpp
+@@ -29,6 +29,7 @@
+ #define EGL_EGLEXT_PROTOTYPES
+ 
+ #include <binder/IPCThreadState.h>
++#include <cutils/properties.h>
+ #include <gui/BufferItem.h>
+ #include <gui/BufferQueueCore.h>
+ #include <gui/BufferQueueProducer.h>
+@@ -103,6 +104,16 @@ status_t BufferQueueProducer::setMaxDequeuedBufferCount(
+             return NO_INIT;
+         }
+ 
++        // 40S404: the Vivante EGL occasionally dequeues a third buffer before the previous one
++        // has been queued (swap with EGL_BUFFER_PRESERVED); with maxDequeued=2 that fails with
++        // "attempting to exceed the max dequeued buffer count" and HWUI stops rendering.
++        {
++            static const int minMaxDequeued = property_get_int32("ro.bq.min_max_dequeued", 0);
++            if (maxDequeuedBuffers > 0 && maxDequeuedBuffers < minMaxDequeued) {
++                maxDequeuedBuffers = minMaxDequeued;
++            }
++        }
++
+         if (maxDequeuedBuffers == mCore->mMaxDequeuedBufferCount) {
+             return NO_ERROR;
+         }
+@@ -240,10 +251,11 @@ int BufferQueueProducer::getFreeSlotLocked() const {
+ }
+ 
+ status_t BufferQueueProducer::waitForFreeSlotThenRelock(FreeSlotCaller caller,
+-        int* found) const {
++        int* found, bool skipMaxDequeuedCheck) const {
+     auto callerString = (caller == FreeSlotCaller::Dequeue) ?
+             "dequeueBuffer" : "attachBuffer";
+     bool tryAgain = true;
++    nsecs_t waitedForQueue = 0;
+     while (tryAgain) {
+         if (mCore->mIsAbandoned) {
+             BQ_LOGE("%s: BufferQueue has been abandoned", callerString);
+@@ -264,8 +276,23 @@ status_t BufferQueueProducer::waitForFreeSlotThenRelock(FreeSlotCaller caller,
+         // Producers are not allowed to dequeue more than
+         // mMaxDequeuedBufferCount buffers.
+         // This check is only done if a buffer has already been queued
+-        if (mCore->mBufferHasBeenQueued &&
++        // 40S404: the Freescale VPU decoder holds every buffer it is given (formats 0x100-0x103), so
++        // it legitimately dequeues up to the full buffer count; it then blocks below until
++        // SurfaceFlinger releases a buffer.
++        if (mCore->mBufferHasBeenQueued && !skipMaxDequeuedCheck &&
+                 dequeuedCount >= mCore->mMaxDequeuedBufferCount) {
++            // 40S404: the Vivante EGL starts the next frame's dequeue while the previous frame's
++            // queueBuffer is still in flight (SurfaceFlinger busy), which is one dequeue too many.
++            // Wait a little for that queueBuffer instead of failing: a failed dequeue makes HWUI
++            // stop rendering (EGL_BAD_NATIVE_WINDOW) and the app looks frozen.
++            static const nsecs_t maxWait =
++                    ms2ns(property_get_int32("ro.bq.dequeue_wait_ms", 0));
++            if (waitedForQueue < maxWait) {
++                nsecs_t start = systemTime(SYSTEM_TIME_MONOTONIC);
++                mCore->mDequeueCondition.waitRelative(mCore->mMutex, maxWait - waitedForQueue);
++                waitedForQueue += systemTime(SYSTEM_TIME_MONOTONIC) - start;
++                continue;
++            }
+             BQ_LOGE("%s: attempting to exceed the max dequeued buffer count "
+                     "(%d)", callerString, mCore->mMaxDequeuedBufferCount);
+             return INVALID_OPERATION;
+@@ -393,7 +420,7 @@ status_t BufferQueueProducer::dequeueBuffer(int *outSlot,
+         int found = BufferItem::INVALID_BUFFER_SLOT;
+         while (found == BufferItem::INVALID_BUFFER_SLOT) {
+             status_t status = waitForFreeSlotThenRelock(FreeSlotCaller::Dequeue,
+-                    &found);
++                    &found, format >= 0x100 && format <= 0x103);
+             if (status != NO_ERROR) {
+                 return status;
+             }

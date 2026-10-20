@@ -1,4 +1,0 @@
-# Removable media only; primary storage is FUSE-emulated (/data/media), not vold-managed.
-# Sysfs paths are taken from the stock unit's vold.fstab.
-dev_mount sdcard1 /storage/extsd auto /devices/platform/sdhci-esdhc-imx.2/mmc_host/mmc2
-dev_mount usbdisk /storage/udisk auto /devices/platform/fsl-ehci

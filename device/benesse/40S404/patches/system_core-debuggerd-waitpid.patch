@@ -1,0 +1,49 @@
+diff --git a/debuggerd/debuggerd.cpp b/debuggerd/debuggerd.cpp
+index 6189a76..f3c8cdb 100644
+--- a/debuggerd/debuggerd.cpp
++++ b/debuggerd/debuggerd.cpp
+@@ -165,6 +165,11 @@ static bool selinux_action_allowed(int s, debugger_request_t* request)
+ 
+   perm = debuggerd_perms[request->action];
+ 
++  // 40S404: kernel without SELinux -> there is no policy to consult, allow.
++  if (is_selinux_enabled() <= 0) {
++    return true;
++  }
++
+   if (getpeercon(s, &scon) < 0) {
+     ALOGE("Cannot get peer context from socket\n");
+     goto out;
+@@ -736,11 +741,29 @@ static void monitor_worker_process(int child_pid, const debugger_request_t& requ
+   bool kill_target = false;
+   bool kill_self = false;
+ 
+-  int status;
++  int status = 0;
+   siginfo_t siginfo;
+-  int signal = TEMP_FAILURE_RETRY(sigtimedwait(&signal_set, &siginfo, &timeout));
++  // 40S404 (kernel 3.0.35): SIGCHLD is also delivered for events of the ptraced crashing process, so
++  // waitpid() on the worker legitimately returns 0 -- keep waiting for the worker instead of
++  // declaring murder-suicide (which SIGKILLed the crashing process and left no tombstone).
++  struct timespec deadline;
++  clock_gettime(CLOCK_MONOTONIC, &deadline);
++  deadline.tv_sec += timeout.tv_sec > INT_MAX / 2 ? INT_MAX / 2 : timeout.tv_sec;
++  int signal;
++  pid_t rc = 0;
++  for (;;) {
++    struct timespec now, remain;
++    clock_gettime(CLOCK_MONOTONIC, &now);
++    remain.tv_sec = deadline.tv_sec - now.tv_sec;
++    remain.tv_nsec = deadline.tv_nsec - now.tv_nsec;
++    if (remain.tv_nsec < 0) { remain.tv_sec--; remain.tv_nsec += 1000000000; }
++    if (remain.tv_sec < 0) { signal = -1; break; }
++    signal = TEMP_FAILURE_RETRY(sigtimedwait(&signal_set, &siginfo, &remain));
++    if (signal != SIGCHLD) break;
++    rc = waitpid(child_pid, &status, WNOHANG | WUNTRACED);
++    if (rc != 0) break;  // 0: spurious SIGCHLD, the worker is still running
++  }
+   if (signal == SIGCHLD) {
+-    pid_t rc = waitpid(-1, &status, WNOHANG | WUNTRACED);
+     if (rc != child_pid) {
+       ALOGE("debuggerd: waitpid returned unexpected pid (%d), committing murder-suicide", rc);
+ 

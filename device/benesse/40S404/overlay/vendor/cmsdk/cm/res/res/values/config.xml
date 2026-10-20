@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LiveDisplay off by default: any non-identity colour matrix makes SurfaceFlinger skip the
+     hardware composer for every layer and composite on the GC880 with an extra colour shader,
+     which cut the frame rate from ~60 fps to ~10 fps on the 40S404. -->
+<resources>
+    <integer name="config_defaultLiveDisplayMode">0</integer>
+</resources>
